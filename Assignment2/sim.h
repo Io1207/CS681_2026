@@ -6,18 +6,25 @@
 #include <numeric>
 #include <algorithm>
 
+#include "servers.h" 
+
+
 using namespace std;
 
 using Time = double;
 
 struct Config {
-    int cores = 4;
-    int maxThreads = 16;
     int users = 50;
-    Time contextSwitch = 0.0005;
     Time warmup = 5.0;
     Time simTime = 60.0;
     int runs = 10;
+    vector<ServerConfig> scfgs;
+
+
+
+    int cores = 4;
+    int maxThreads = 16;
+    Time contextSwitch = 0.0005;
     enum Dist { CONST, UNIFORM, EXP } serviceDist = EXP;
     Time serviceMin = 0.005;
     Time serviceVar = 0.01;

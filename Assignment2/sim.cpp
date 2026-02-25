@@ -2,22 +2,22 @@
 /*
     g++ -std=c++20 sim.cpp -O2 -o sim
 */
-using Time = double;
+// using Time = double;
 
-struct Config {
-    int cores = 4;
-    int maxThreads = 16;
-    int users = 50;
-    Time contextSwitch = 0.0005;
-    Time warmup = 5.0;
-    Time simTime = 60.0;
-    int runs = 10;
-    enum Dist { CONST, UNIFORM, EXP } serviceDist = EXP;
-    Time serviceMin = 0.005;
-    Time serviceVar = 0.01;
-    Time timeoutMin = 0.05;
-    Time timeoutVar = 0.05;
-};
+// struct Config {
+//     int cores = 4;
+//     int maxThreads = 16;
+//     int users = 50;
+//     Time contextSwitch = 0.0005;
+//     Time warmup = 5.0;
+//     Time simTime = 60.0;
+//     int runs = 10;
+//     enum Dist { CONST, UNIFORM, EXP } serviceDist = EXP;
+//     Time serviceMin = 0.005;
+//     Time serviceVar = 0.01;
+//     Time timeoutMin = 0.05;
+//     Time timeoutVar = 0.05;
+// };
 
 struct RNG {
     mt19937 gen;
@@ -39,16 +39,34 @@ struct RNG {
 struct Request {
     int id;
     int user;
-    Time arrival;
     Time start = -1;
     Time completion = -1;
     bool timedOut = false;
     bool completed = false;
+
+    vector<int> serverVisitCounts;
+    vector<Time> serviceStartTimes;
+    vector<Time> serviceResponseTimes;
+    int activeServer;
+};
+
+enum EventTypes {
+
+    LEAVE_CLIENT,
+    ENTER_CLIENT,
+    ENTER_SERVER, 
+    CTX_SWITCH_IN,
+    CTX_SWITCH_OUT,
+    FINISH_SERVICE,
+    CLIENT_TIMEOUT,
+
 };
 
 struct Event {
     Time time;
-    int type;
+    EventTypes type;
+    int serverId;
+    int coreId = -1;
     int reqId;
     bool operator>(Event const& o) const { return time > o.time; }
 };
@@ -61,12 +79,14 @@ class Simulation {
     priority_queue<Event, vector<Event>, greater<Event>> fel;
 
     vector<Request> requests;
-    queue<int> threadQueue;
-    int activeThreads = 0;
-    int nextCore = 0;
+    // queue<int> threadQueue;
+    // int activeThreads = 0;
+    // int nextCore = 0;
 
-    vector<Time> coreBusy;
-    vector<Time> coreLastStart;
+    // vector<Time> coreBusy;
+    // vector<Time> coreLastStart;
+
+    vector<Server> servers;
 
     int nextReqId = 0;
 
@@ -101,13 +121,13 @@ public:
         return rng.lognormal(0.0,0.5);
     }
 
-    void schedule(Time t, int type, int reqId) {
+    void schedule(Time t, EventTypes type, int reqId) {
         fel.push({t,type,reqId});
     }
 
     void scheduleThink(int user, Time base) {
         Time t = base + thinkTime();
-        schedule(t,0,user);
+        schedule(t,LEAVE_CLIENT,user);
     }
 
     void startRequest(int user) {
@@ -117,10 +137,10 @@ public:
         r.arrival = now;
         requests.push_back(r);
         int id = r.id;
-        schedule(now + timeoutTime(),3,id);
+        schedule(now + timeoutTime(),CLIENT_TIMEOUT,id);
         if(activeThreads < cfg.maxThreads) {
             activeThreads++;
-            schedule(now,1,id);
+            schedule(now,ENTER_SERVER,id);
         } else {
             threadQueue.push(id);
         }
@@ -134,7 +154,7 @@ public:
         nextCore = (nextCore+1)%cfg.cores;
         coreLastStart[core] = now;
         Time s = serviceTime() + cfg.contextSwitch;
-        schedule(now+s,2,id);
+        schedule(now+s,FINISH_SERVICE,id);
     }
 
     void finishService(int id) {
@@ -146,7 +166,7 @@ public:
         if(r.timedOut) bad++;
         else good++;
         if(now > cfg.warmup && !r.timedOut) {
-            respSum += r.completion - r.arrival;
+            respSum += r.completion - r.start;
             respCount++;
         }
         scheduleThink(r.user,now);
@@ -154,7 +174,7 @@ public:
             int nxt = threadQueue.front();
             threadQueue.pop();
             activeThreads++;
-            schedule(now,1,nxt);
+            schedule(now,ENTER_SERVER,nxt);
         }
     }
 
@@ -171,10 +191,10 @@ public:
             if(e.time > cfg.simTime) break;
             now = e.time;
             switch(e.type) {
-                case 0: startRequest(e.reqId); break;
-                case 1: beginService(e.reqId); break;
-                case 2: finishService(e.reqId); break;
-                case 3: timeoutRequest(e.reqId); break;
+                case LEAVE_CLIENT: startRequest(e.reqId); break;
+                case ENTER_SERVER: beginService(e.reqId); break;
+                case FINISH_SERVICE: finishService(e.reqId); break;
+                case CLIENT_TIMEOUT: timeoutRequest(e.reqId); break;
             }
         }
         for(int i=0;i<cfg.cores;i++)

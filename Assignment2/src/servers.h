@@ -63,13 +63,12 @@ public:
 	Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed);
 
 	double serviceTime() {
-		if(cfg.serviceDist == Config::CONST)
+		if(cfg.serviceDist == ServerConfig::CONST)
 			return cfg.serviceMin;
-		if(cfg.serviceDist == Config::UNIFORM)
+		if(cfg.serviceDist == ServerConfig::UNIFORM)
 			return rng.uniform(cfg.serviceMin, cfg.serviceMin+cfg.serviceVar);
 		return cfg.serviceMin + rng.exponential(1.0/cfg.serviceVar);
 	}
-
 
 	void processEvent(const Event& e);
 

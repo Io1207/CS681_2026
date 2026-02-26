@@ -1,5 +1,5 @@
 #include "sim.h"
-#include "server.h"
+#include "servers.h"
 struct Config;
 
 /*
@@ -63,8 +63,10 @@ Time ClientNode::thinkTime() {
     return thinkMin + rng.lognormal(0.0, thinkVar);
 }
 
-Simulation::Simulation(Config c, unsigned seed) : cfg(c), rng(seed) {
-    ClientNode* client = new ClientNode(cfg.users, cfg.thinkMin, cfg.thinkVar, seed, cfg.adjMatrix[0]);
+Simulation::Simulation(Config c, unsigned seed) : cfg(c), rng(seed), client(cfg.users, cfg.thinkMin, cfg.thinkVar, seed, cfg.adjMatrix[0]) {
+    metrics.nodeVisitCounts.resize(cfg.numServers);
+    metrics.serverDemands.resize(cfg.numServers);
+    metrics.serverResponseTimes.resize(cfg.numServers);
     for(int i=0;i<cfg.users;i++) {
         schedule(cfg.ease_in*i/cfg.users, LEAVE_CLIENT, client.route(), i);
     }
@@ -78,6 +80,14 @@ void Simulation::scheduleThink(int user, Time base) {
     schedule(base+thinkTime(), LEAVE_CLIENT, client.route(), user);
 }
 
+Request& Simulation::getRequest(int reqId) {
+    return requests[reqId-1];
+}
+
+Time Simulation::simTime() {
+    return now;
+}
+
 Time Simulation::thinkTime() {
     return cfg.thinkMin + rng.lognormal(0.0,cfg.thinkVar);    
 }
@@ -86,25 +96,25 @@ void Simulation::run() {
     while (!fel.empty()) {
         Event e = fel.top();
         fel.pop();
+        int lastReqId = requests.size();
         switch (e.type) {
-            case LEAVE_CLIENT: servers[e.serverId].processEvent(Event(e.time(), ENTER_SERVER, e.serverId, -1, requests.size()+1));
-                               requests.push_back({e.reqId, e.serverId, e.time(), false, false}); break;
+            case LEAVE_CLIENT: servers[e.serverId].processEvent(Event(e.time, ENTER_SERVER, e.serverId, -1, lastReqId+1));
+                               client.visitCount++;
+                               requests.emplace_back(lastReqId+1, e.serverId, cfg.numServers); break;
             case ENTER_CLIENT: scheduleThink(e.reqId, e.time); break;
             case CLIENT_TIMEOUT: scheduleThink(e.reqId, e.time); break;
         }
     }
 }
 
-Metrics Simulation::results() {
-    double effTime = cfg.simTime - cfg.warmup;
-    Metrics m{};
-    m.avgResp = respCount ? respSum/respCount : 0.0;
-    m.throughput = completed/effTime;
-    m.goodput = good/effTime;
-    m.badput = bad/effTime;
-    m.dropRate = (double)dropped/(completed+dropped+1e-9);
-    m.util = (double)activeThreads/(cfg.maxThreads+1e-9);
-    return m;
+SimMetrics Simulation::results() {
+    double effTime = simTime() - cfg.warmup;
+    SimMetrics m{};
+    for (int i = 0; i<cfg.numServers; i++) {
+        m.nodeVisitCounts[i] = servers[i].getVisits();
+        m.serverDemands[i] = servers[i].getAvgServiceTime();
+        m.serverDemands[i] = servers[i].getAvgResponseTime();
+    }
 }
 
 pair<double,double> meanCI(vector<double> &v) {

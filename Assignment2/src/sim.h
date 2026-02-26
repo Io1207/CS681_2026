@@ -30,6 +30,8 @@ struct Request
 
     vector<int> serverVisitCounts;
     vector<Time> serviceStartTimes;
+    vector<Time> coreStartTimes;
+    vector<Time> serviceTimes;
     vector<Time> serviceResponseTimes;
     int activeServer;
     Time remService;
@@ -66,7 +68,8 @@ class ClientNode {
     Time thinkVar;
     RNG rng;
     vector<pair<int,double>> outProbs;
-    public: 
+    public:
+        int visitCount = 0;
         ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> outProbs);
         Time thinkTime();
         int route();
@@ -117,6 +120,8 @@ class Simulation {
     Config cfg;
     RNG rng;
     Time now = 0.0;
+    ClientNode client;
+    SimMetrics metrics;
 
     priority_queue<Event, vector<Event>, greater<Event>> fel;
 
@@ -141,13 +146,22 @@ public:
     void schedule(Time t, EventTypes type, int sId, int reqId, int coreId = -1);
     void scheduleThink(int user, Time base);
     void run();
+    Request& getRequest(int reqId);
+    Time simTime();
+    SimMetrics results();
 
-    struct Metrics {
-        double avgResp;
-        double throughput;
-        double goodput;
-        double badput;
-        double dropRate;
-        double util;
-    };
+    void printResults(string filename);
+};
+
+
+struct SimMetrics {
+    vector<int> nodeVisitCounts;
+    vector<double> serverDemands;
+    vector<double> serverResponseTimes;
+    double util;
+    double throughput;
+    double goodput;
+    double badput;
+    double dropRate;
+    double sysResponseTime;
 };

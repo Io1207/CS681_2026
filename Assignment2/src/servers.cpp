@@ -29,7 +29,7 @@ void Server::processEvent(const Event& e)
 void Server::EnterServer(Request& req)
 {
 	// if(req.timedOut)	return;
-	req.serverVisitCounts[serverId]++;
+	numReqs++;
 	req.serviceStartTimes[serverId] = sim.simTime();
 	req.activeServer = serverId;
 	req.remService = serviceTime();
@@ -46,24 +46,26 @@ void Server::EnterServer(Request& req)
 			}
 		}
 	}
+
+	// Schedule SERVER_TIMEOUT
+	sim.schedule(sim.simTime() + cfg.timeout, 
+				SERVER_TIMEOUT, 
+				serverId, 
+				req.id,
+				-1);
 	if(idealCore == -1)
 	{
 		// All threads busy
 		// Put in thread queue
 		if(threadQueue.size() < cfg.maxQueue)
 		{
-			// Schedule SERVER_TIMEOUT 
-			sim.schedule(sim.simTime() + cfg.timeout, 
-						SERVER_TIMEOUT, 
-						serverId, 
-						req.id,
-						-1);
+			
 			threadQueue.push(req.id);
 		}
 		else 
 		{
 			// Drop the request
-			dropped++;
+			bad++;
 			//Schedule ENTER_CLIENT -- reqId of event is userId of req
 			sim.schedule(sim.simTime(), 
 						ENTER_CLIENT, 
@@ -75,6 +77,7 @@ void Server::EnterServer(Request& req)
 	}
 	else 
 	{
+		req.coreStartTimes[serverId] = sim.simTime();
 		// Assign to a thread 
 		coreQueue[idealCore].push(req.id);
 
@@ -98,6 +101,7 @@ void Server::CtxSwitchIn(Request& req, const Event& e)
 	if(coreQueue[core].front() != req.id)
 		throw "Mismatching Event and Core Queue";
 	if(req.serverTimedOut) {
+		bad++;
 		req.timedOut = true;
 		sim.schedule(sim.simTime(), 
 						ENTER_CLIENT, 
@@ -136,6 +140,7 @@ void Server::CtxSwitchOut(Request& req, const Event& e)
 		throw "Mismatching Event and Core Queue";
 	if(req.serverTimedOut) {
 		req.timedOut = true;
+		bad++;
 		sim.schedule(sim.simTime(), 
 						ENTER_CLIENT, 
 						0, 
@@ -176,6 +181,7 @@ void Server::FinishService(Request& req, const Event& e)
 		throw "Mismatching Event and Core Queue";
 	if(req.serverTimedOut) {
 		req.timedOut = true;
+		bad++;
 		sim.schedule(sim.simTime(), 
 						ENTER_CLIENT, 
 						0, 
@@ -185,9 +191,18 @@ void Server::FinishService(Request& req, const Event& e)
 		coreQueue[core].pop();
 		assignThread(core);
 	}
-	
 	req.remService = 0;
-	req.serviceResponseTimes[serverId] += e.time - req.serviceStartTimes[serverId];
+
+	Time resp = e.time - req.serviceStartTimes[serverId];
+	Time serv = e.time - req.serviceTimes[serverId];
+
+	req.serviceResponseTimes[serverId] += resp;
+	req.serviceTimes[serverId] += serv;
+
+	responseTimes.push_back(resp);
+	serviceTimes.push_back(serv);
+
+	good++;
 
 	// Find next Server
 	int nextServer = -1;
@@ -212,6 +227,8 @@ void Server::FinishService(Request& req, const Event& e)
 	coreQueue[core].pop();
 	if(nextServer == 0)
 	{
+		req.completed = true;
+		req.completion = sim.simTime();
 		// Schedule ENTER_CLIENT -- reqId of event is userId of req
 		sim.schedule(sim.simTime(), 
 					ENTER_CLIENT, 
@@ -249,12 +266,11 @@ void Server::FinishService(Request& req, const Event& e)
 	// }
 }
 
-void ServerTimeout(Request& req)
+void Server::ServerTimeout(Request& req)
 {
-	req.serverTimedOut = true;
+	if(req.activeServer == serverId)
+		req.serverTimedOut = true;
 }
-
-
 
 void Server::updateMetrics()
 {

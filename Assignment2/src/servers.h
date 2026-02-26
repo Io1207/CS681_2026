@@ -45,12 +45,15 @@ class Server {
 
 	vector<Time> coreLastSwitchIn;
 
+	vector<Time> responseTimes;
+	vector<Time> serviceTimes;
+
 	Simulation& sim;
 
-	int completed = 0;
     int good = 0;
     int bad = 0;
-    int dropped = 0;
+
+	int numReqs = 0; 
 
 	int totalInServer = 0;
 	int numCoresActive = 0;
@@ -72,6 +75,27 @@ public:
 
 	void processEvent(const Event& e);
 
+	int getCompleted() const { return good+bad;}
+	int getGood() const { return good;}
+	int getBad() const { return bad;}
+
+	int getVisits() const { return numReqs;}
+
+	double getAvgResponseTime() const
+	{
+		return accumulate(responseTimes.begin(), responseTimes.end(), 0.0) / (responseTimes.size() + 1e-9);
+	}
+
+	double getAvgServiceTime() const
+	{
+		return accumulate(serviceTimes.begin(), serviceTimes.end(), 0.0) / (serviceTimes.size() + 1e-9);
+	}
+
+	double getUtilisation() const {return totalActiveTime / (cfg.numCores * sim.simTime());}
+	double getAvgInServer() const {return sumTotalInServer / (sim.simTime());}
+	
+
+
 private:
 	void EnterServer(Request& req);
 	void CtxSwitchIn(Request& req, const Event& e);
@@ -86,6 +110,8 @@ private:
 		if(threadQueue.size() > 0)
 		{
 			int newReq = threadQueue.front(); threadQueue.pop();
+			Request& req = sim.getRequest(newReq);
+			req.coreStartTimes[serverId] = sim.simTime();
 			coreQueue[core].push(newReq);
 		}
 

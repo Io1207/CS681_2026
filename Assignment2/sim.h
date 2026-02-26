@@ -66,12 +66,23 @@ struct Request
     Time completion = -1;
     bool timedOut = false;
     bool completed = false;
+    bool serverTimedOut = false;
 
     vector<int> serverVisitCounts;
     vector<Time> serviceStartTimes;
     vector<Time> serviceResponseTimes;
     int activeServer;
     Time remService;
+
+    Request(int id, int user, int serverCount) : id(id), user(user)
+    {
+        serverVisitCounts.resize(serverCount, 0);
+        serviceStartTimes.resize(serverCount, -1);
+        serviceResponseTimes.resize(serverCount, 0);
+        activeServer = -1;
+        remService = 0;
+    }   
+
 };
 
 enum EventTypes
@@ -84,6 +95,7 @@ enum EventTypes
     CTX_SWITCH_OUT,
     FINISH_SERVICE,
     CLIENT_TIMEOUT,
+    SERVER_TIMEOUT,
 
 };
 
@@ -163,9 +175,9 @@ public:
         return requests[reqId];
     }
 
-    void schedule(Time t, EventTypes type, int reqId)
+    void schedule(Time t, EventTypes type, int sId, int reqId, int coreId = -1)
     {
-        fel.push({t, type, reqId});
+        fel.push({t, type, sId, coreId, reqId});
     }
 
     void scheduleThink(int user, Time base)

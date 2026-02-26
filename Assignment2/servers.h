@@ -59,6 +59,8 @@ class Server {
 	Time totalActiveTime;
 	Time sumTotalInServer;
 
+public:
+
 	Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed);
 
 	double serviceTime() {
@@ -72,12 +74,34 @@ class Server {
 
 	void processEvent(const Event& e);
 
+private:
 	void EnterServer(Request& req);
 	void CtxSwitchIn(Request& req, const Event& e);
 	void CtxSwitchOut(Request& req, const Event& e);
 	void FinishService(Request& req, const Event& e);
+	void ServerTimeout(Request& req);
 
 	void updateMetrics();   // Updates time averages indicators
+
+	void assignThread(int core)
+	{
+		if(threadQueue.size() > 0)
+		{
+			int newReq = threadQueue.front(); threadQueue.pop();
+			coreQueue[core].push(newReq);
+		}
+
+		if(coreQueue[core].size() > 0)
+		{
+			// Schedule CTX_SWITCH_IN
+			sim.schedule(sim.simTime() + cfg.contextSwitchTime, 
+						CTX_SWITCH_IN, 
+						serverId, 
+						coreQueue[core].front(),
+						core);
+
+		}
+	}
 
 };
 

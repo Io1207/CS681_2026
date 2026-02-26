@@ -53,13 +53,24 @@ void Server::EnterServer(Request& req)
 		if(threadQueue.size() < cfg.maxQueue)
 		{
 			// Schedule SERVER_TIMEOUT 
+			sim.schedule(sim.simTime() + cfg.timeout, 
+						SERVER_TIMEOUT, 
+						serverId, 
+						req.id,
+						-1);
 			threadQueue.push(req.id);
 		}
 		else 
 		{
 			// Drop the request
 			dropped++;
-			//Schedule ENTER_CLIENT
+			//Schedule ENTER_CLIENT -- reqId of event is userId of req
+			sim.schedule(sim.simTime(), 
+						ENTER_CLIENT, 
+						0, 
+						req.user, 
+						-1);
+			
 		}
 	}
 	else 
@@ -70,23 +81,51 @@ void Server::EnterServer(Request& req)
 		// Possibly call switch in
 		if(coreQueue[idealCore].size() == 1)
 		{
-			sim.schedule(/*add args*/);
+			// Schedule CTX_SWITCH_IN
+			sim.schedule(sim.simTime(), 
+						CTX_SWITCH_IN, 
+						serverId, 
+						req.id, 
+						idealCore);
+			// sim.schedule(/*add args*/);
 		}
 	}
 }
 
 void Server::CtxSwitchIn(Request& req, const Event& e)
 {
-	// if(req.timedOut) {
-	// 	return;
-	// }
+	int core = e.coreId;
+	if(coreQueue[core].front() != req.id)
+		throw "Mismatching Event and Core Queue";
+	if(req.serverTimedOut) {
+		req.timedOut = true;
+		sim.schedule(sim.simTime(), 
+						ENTER_CLIENT, 
+						0, 
+						req.user, 
+						-1);
+
+		coreQueue[core].pop();
+		assignThread(core);
+		return;
+	}
 	if(req.remService < cfg.roundRobinTimeout)
 	{
 		// Schedule Finish Service
+		sim.schedule(sim.simTime() + req.remService, 
+					FINISH_SERVICE, 
+					serverId, 
+					req.id, 
+					e.coreId);
 	}	
 	else 
 	{
 		// Schedule ctx switch out
+		sim.schedule(sim.simTime() + cfg.roundRobinTimeout, 
+					CTX_SWITCH_OUT, 
+					serverId, 
+					req.id, 
+					e.coreId);
 	}
 }
 
@@ -95,16 +134,38 @@ void Server::CtxSwitchOut(Request& req, const Event& e)
 	int core = e.coreId;
 	if(core < 0 || coreQueue[core].front() != req.id)
 		throw "Mismatching Event and Core Queue";
+	if(req.serverTimedOut) {
+		req.timedOut = true;
+		sim.schedule(sim.simTime(), 
+						ENTER_CLIENT, 
+						0, 
+						req.user, 
+						-1);
+
+		coreQueue[core].pop();
+		assignThread(core);
+		return;
+	}
 	req.remService -= cfg.roundRobinTimeout;
 	if(coreQueue[core].size() > 1) {
 		coreQueue[core].pop();
 		coreQueue[core].push(req.id);
 
 		// Schedule CTX_SWITCH_IN after ctx_switch time
+		sim.schedule(sim.simTime() + cfg.contextSwitchTime, 
+					CTX_SWITCH_IN, 
+					serverId, 
+					coreQueue[core].front(),
+					e.coreId);
 	}
 	else 
 	{
 		// Schedule CTX_SWITCH_OUT after RRTime 
+		sim.schedule(sim.simTime() + cfg.roundRobinTimeout, 
+					CTX_SWITCH_OUT, 
+					serverId, 
+					req.id, 
+					e.coreId);
 	}
 }
 
@@ -113,6 +174,17 @@ void Server::FinishService(Request& req, const Event& e)
 	int core = e.coreId;
 	if(core < 0 || coreQueue[core].front() != req.id)
 		throw "Mismatching Event and Core Queue";
+	if(req.serverTimedOut) {
+		req.timedOut = true;
+		sim.schedule(sim.simTime(), 
+						ENTER_CLIENT, 
+						0, 
+						req.user, 
+						-1);
+
+		coreQueue[core].pop();
+		assignThread(core);
+	}
 	
 	req.remService = 0;
 	req.serviceResponseTimes[serverId] += e.time - req.serviceStartTimes[serverId];
@@ -138,19 +210,51 @@ void Server::FinishService(Request& req, const Event& e)
 	req.activeServer = nextServer;
 
 	coreQueue[core].pop();
-	// Schedule ENTER_SERVER
-
-	if(threadQueue.size() > 0)
+	if(nextServer == 0)
 	{
-		int newReq = threadQueue.front(); threadQueue.pop();
-		coreQueue[core].push(newReq);
+		// Schedule ENTER_CLIENT -- reqId of event is userId of req
+		sim.schedule(sim.simTime(), 
+					ENTER_CLIENT, 
+					0, 
+					req.user, 
+					-1);
+	}
+	else 
+	{
+		// Schedule ENTER_SERVER
+		sim.schedule(sim.simTime(), 
+					ENTER_SERVER, 
+					nextServer, 
+					req.id, 
+					-1);
 	}
 
-	if(coreQueue[core].size() > 0)
-	{
-		// Schedule CTX_SWITCH_IN
-	}
+
+	assignThread(core);
+	// if(threadQueue.size() > 0)
+	// {
+	// 	int newReq = threadQueue.front(); threadQueue.pop();
+	// 	coreQueue[core].push(newReq);
+	// }
+
+	// if(coreQueue[core].size() > 0)
+	// {
+	// 	// Schedule CTX_SWITCH_IN
+	// 	sim.schedule(sim.simTime() + cfg.contextSwitchTime, 
+	// 				CTX_SWITCH_IN, 
+	// 				serverId, 
+	// 				coreQueue[core].front(),
+	// 				core);
+
+	// }
 }
+
+void ServerTimeout(Request& req)
+{
+	req.serverTimedOut = true;
+}
+
+
 
 void Server::updateMetrics()
 {

@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 #include "lcgrand.h"  /* Header file for random-number generator. */
 
 #define Q_LIMIT 3000  /* Limit on queue length. */

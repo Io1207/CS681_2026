@@ -1,0 +1,20 @@
+Some changes right off the bat:
+Each run has a fixed number of events not a fixed duration
+scheduler check please
+Branching networks, open load 
+
+diff arch of web server?:
+server, node and generator class
+
+measurements from A1: for single server node closed loop
+
+
+
+about Requests:
+    maybe shouldn't have a separate variable for timedOut, completed
+
+
+Some Interesting Simulations:
+- When thread pool becomes bottleneck
+- When CPU becomes bottleneck
+- When system becomes timeout-dominated

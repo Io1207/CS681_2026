@@ -68,17 +68,20 @@ struct Request
     bool completed = false;
     bool serverTimedOut = false;
 
-    vector<int> serverVisitCounts;
     vector<Time> serviceStartTimes;
+    vector<Time> coreStartTimes;
     vector<Time> serviceResponseTimes;
+    vector<Time> serviceTimes;
     int activeServer;
     Time remService;
 
     Request(int id, int user, int serverCount) : id(id), user(user)
     {
-        serverVisitCounts.resize(serverCount, 0);
-        serviceStartTimes.resize(serverCount, -1);
-        serviceResponseTimes.resize(serverCount, 0);
+        serviceStartTimes.resize(serverCount+1, -1);
+        serviceResponseTimes.resize(serverCount+1, 0);
+        coreStartTimes.resize(serverCount+1, -1);
+        serviceTimes.resize(serverCount+1, 0);
+
         activeServer = -1;
         remService = 0;
     }   

@@ -81,6 +81,8 @@ public:
 	int getGood() const { return good;}
 	int getBad() const { return bad;}
 
+	int getVisits() const { return numReqs;}
+
 	double getAvgResponseTime() const
 	{
 		return accumulate(responseTimes.begin(), responseTimes.end(), 0.0) / (responseTimes.size() + 1e-9);

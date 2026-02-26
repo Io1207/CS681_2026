@@ -140,7 +140,6 @@ void Server::CtxSwitchOut(Request& req, const Event& e)
 		throw "Mismatching Event and Core Queue";
 	if(req.serverTimedOut) {
 		req.timedOut = true;
-		dropped++;
 		bad++;
 		sim.schedule(sim.simTime(), 
 						ENTER_CLIENT, 
@@ -182,7 +181,6 @@ void Server::FinishService(Request& req, const Event& e)
 		throw "Mismatching Event and Core Queue";
 	if(req.serverTimedOut) {
 		req.timedOut = true;
-		dropped++;
 		bad++;
 		sim.schedule(sim.simTime(), 
 						ENTER_CLIENT, 

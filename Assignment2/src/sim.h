@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <vector>
 #include <queue>
@@ -24,6 +26,7 @@ struct Request
     Time completion = -1;
     bool timedOut = false;
     bool completed = false;
+    bool serverTimedOut = false;
 
     vector<int> serverVisitCounts;
     vector<Time> serviceStartTimes;
@@ -94,9 +97,12 @@ enum EventTypes {
     CTX_SWITCH_OUT,
     FINISH_SERVICE,
     CLIENT_TIMEOUT,
+    SERVER_TIMEOUT,
+
 };
 
-struct Event {
+struct Event
+{
     Time time;
     EventTypes type;
     int serverId;

@@ -52,6 +52,7 @@ struct Config {
     int users;
     int numServers;
     int numDelays;
+    int run_id;
     vector<vector<double>> adjMatrix;
     vector<ServerConfig> scfgs;
     Time ease_in;
@@ -103,7 +104,6 @@ enum EventTypes {
     FINISH_SERVICE,
     CLIENT_TIMEOUT,
     SERVER_TIMEOUT,
-
 };
 
 struct Event
@@ -160,6 +160,7 @@ struct SimMetrics {
     vector<int> nodeVisitCounts;
     vector<double> serverDemands;
     vector<double> serverResponseTimes;
+    vector<double> throughputs;
     double util;
     double throughput;
     double goodput;

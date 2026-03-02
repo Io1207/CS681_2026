@@ -182,6 +182,10 @@ void Server::FinishService(Request& req, const Event& e)
 	if(req.serverTimedOut) {
 		req.timedOut = true;
 		bad++;
+
+		// AS: should we not make the timeout time the response time for the request?
+		// req.completion = sim.simTime();
+
 		sim.schedule(sim.simTime(), 
 						ENTER_CLIENT, 
 						0, 
@@ -287,4 +291,3 @@ void Server::updateMetrics()
 	}
 	totalInServer += threadQueue.size();
 }
-

@@ -10,7 +10,6 @@
 
 using namespace std;
 
-
 struct ServerConfig {
 	using Time = double;
 
@@ -126,6 +125,4 @@ private:
 
 		}
 	}
-
 };
-

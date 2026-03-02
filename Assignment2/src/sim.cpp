@@ -1,17 +1,30 @@
 #include "sim.h"
 #include "servers.h"
+#include <map>
+
 struct Config;
 
 /*
     g++ -std=c++20 sim.cpp -O2 -o sim
 */
 
+map<double, double> confidenceIntervals = {
+    {0.90, 1.645},
+    {0.95, 1.96},
+    {0.99, 2.576},
+    {0.80, 1.282},
+    {0.85, 1.44}
+};
+
 Config::Config(string filename) {
     ifstream f(filename);
+    if (!f.is_open()) {
+        throw runtime_error("Could not open config file");
+    }
+    f >> numDelays;
     f >> users;
     f >> ease_in >> timeout >> thinkMin >> thinkVar;
     f >> numServers;
-    f >> numDelays;
 
     adjMatrix.resize(numServers+1);
     for(int i=0;i<numServers;i++) {
@@ -64,11 +77,13 @@ Time ClientNode::thinkTime() {
 }
 
 Simulation::Simulation(Config c, unsigned seed) : cfg(c), rng(seed), client(cfg.users, cfg.thinkMin, cfg.thinkVar, seed, cfg.adjMatrix[0]) {
+
     metrics.nodeVisitCounts.resize(cfg.numServers);
     metrics.serverDemands.resize(cfg.numServers);
     metrics.serverResponseTimes.resize(cfg.numServers);
+
     for(int i=0;i<cfg.users;i++) {
-        schedule(cfg.ease_in*i/cfg.users, LEAVE_CLIENT, client.route(), i);
+        schedule(cfg.ease_in*i/cfg.users + rng.exponential(0.005), LEAVE_CLIENT, client.route(), i);
     }
 }
 
@@ -108,29 +123,50 @@ void Simulation::run() {
 }
 
 SimMetrics Simulation::results() {
-    double effTime = simTime() - cfg.warmup;
+    // double effTime = simTime() - cfg.warmup;
     SimMetrics m{};
+    int totalCompleted = 0;
     for (int i = 0; i<cfg.numServers; i++) {
+        totalCompleted += servers[i].getCompleted();
         m.nodeVisitCounts[i] = servers[i].getVisits();
         m.serverDemands[i] = servers[i].getAvgServiceTime();
         m.serverDemands[i] = servers[i].getAvgResponseTime();
     }
+    int totalVisits = accumulate(m.nodeVisitCounts.begin(), m.nodeVisitCounts.end(), 0);
+    
+    transform(m.nodeVisitCounts.begin(), m.nodeVisitCounts.end(), m.nodeVisitCounts.begin(), [totalVisits] (int x) {return x/totalVisits;});
+
+    for (int i = 0; i<cfg.numServers; i++) {
+        m.serverResponseTimes[i] = m.serverResponseTimes[i] / m.nodeVisitCounts[i];
+
+    }
 }
 
-pair<double,double> meanCI(vector<double> &v) {
+pair<double,double> meanCI(vector<double> &v, double confidence = 0.95) {
     int n=v.size();
     double m=accumulate(v.begin(),v.end(),0.0)/n;
     double s=0;
     for(double x:v) s+=(x-m)*(x-m);
     s=sqrt(s/(n-1));
-    double z=1.96;
-    double h=z*s/sqrt(n);
+    double h=confidenceIntervals[confidence]*s/sqrt(n);
     return {m,h};
 }
 
+SimMetrics getTheoreticalResults(Config sim_config, vector<ServerConfig> sfgs) {
+    SimMetrics t_results = SimMetrics();
+    
+    // getting theoretical relative visits
+
+    vector<double> visits(sim_config.numServers + 1);
+    visits[0] = 1;
+    vector<double> curr_out(sim_config.numServers + 1);
+    for (int i = 0; i <= sim_config.numServers; i++) {
+
+    }
+}
+
 int main() {
-    string filename = "config.txt";
-    Config cfg = Config(filename);
+    Config cfg = Config("config.txt");
     vector<double> resp;
     vector<double> thr;
     vector<double> good;
@@ -139,10 +175,11 @@ int main() {
     vector<double> util;
 
     for(int r=0;r<cfg.runs;r++) {
+        cfg.run_id = r + 1;
         Simulation sim(cfg, r+1);
         sim.run();
         auto m = sim.results();
-        resp.push_back(m.avgResp);
+        // resp.push_back(m.avgResp);
         thr.push_back(m.throughput);
         good.push_back(m.goodput);
         bad.push_back(m.badput);

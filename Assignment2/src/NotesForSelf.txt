@@ -18,3 +18,13 @@ Some Interesting Simulations:
 - When thread pool becomes bottleneck
 - When CPU becomes bottleneck
 - When system becomes timeout-dominated
+
+
+Some questions: 
+- When we are doing these tests do we want to test the performance of a single server or the whole system
+  If the former then we need to do the analysis for each server one by one but then a few measurements don't make sense
+  If the latter then how do we account for the fact that each req is going through a different path in the system
+
+- Still confused about what a delay is
+
+- 

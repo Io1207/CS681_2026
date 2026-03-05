@@ -24,7 +24,6 @@ struct ServerConfig {
     Time serviceVar = 0.01;
     Time timeout;
 	vector<double> outProbs;
-
 };
 
 struct Event;
@@ -59,6 +58,7 @@ class Server {
 	Time lastEvent;
 	Time totalActiveTime;
 	Time sumTotalInServer;
+	string file_name; // change
 
 public:
 
@@ -102,7 +102,7 @@ private:
 	void FinishService(Request& req, const Event& e);
 	void ServerTimeout(Request& req);
 
-	void updateMetrics();   // Updates time averages indicators
+	void updateMetrics(int calling_event);   // Updates time averages indicators
 
 	void assignThread(int core)
 	{

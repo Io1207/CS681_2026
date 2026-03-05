@@ -11,18 +11,26 @@ Server::Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed) :
 	lastEvent(0),
 	sumTotalInServer(0),
 	rng(seed)
-{}
+{
+	file_name = "server_" + (char) id; // change
+}
 
 void Server::processEvent(const Event& e)
 {
 	Request& req = sim.getRequest(e.reqId);
+	int calling_event;
 	switch(e.type)
 	{
+		// case ENTER_SERVER: EnterServer(req); calling_event = 0; break;
+		// case CTX_SWITCH_IN:	CtxSwitchIn(req, e); calling_event = 1; break;
+		// case CTX_SWITCH_OUT: CtxSwitchOut(req, e); calling_event = 2; break;
+		// case FINISH_SERVICE: FinishService(req, e); calling_event = 3; break;
 		case ENTER_SERVER: EnterServer(req); break;
 		case CTX_SWITCH_IN:	CtxSwitchIn(req, e); break;
 		case CTX_SWITCH_OUT: CtxSwitchOut(req, e); break;
 		case FINISH_SERVICE: FinishService(req, e); break;
 	}
+	// update metrics depends on which event calls it, right?
 	updateMetrics();
 }
 
@@ -276,7 +284,7 @@ void Server::ServerTimeout(Request& req)
 		req.serverTimedOut = true;
 }
 
-void Server::updateMetrics()
+void Server::updateMetrics(int calling_event = 0)
 {
 	totalActiveTime += numCoresActive * (sim.simTime() - lastEvent);
 	sumTotalInServer += totalInServer * (sim.simTime() - lastEvent);
@@ -290,4 +298,8 @@ void Server::updateMetrics()
 		totalInServer += coreQueue[i].size();
 	}
 	totalInServer += threadQueue.size();
+
+	ofstream f(file_name);
+	f <<  getAvgServiceTime() << "," << (char)getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
+	return;
 }

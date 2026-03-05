@@ -76,12 +76,13 @@ Time ClientNode::thinkTime() {
     return thinkMin + rng.lognormal(0.0, thinkVar);
 }
 
-Simulation::Simulation(Config c, unsigned seed) : cfg(c), rng(seed), client(cfg.users, cfg.thinkMin, cfg.thinkVar, seed, cfg.adjMatrix[0]) {
+Simulation::Simulation(Config c) : cfg(c), rng(cfg.run_id), client(cfg.users, cfg.thinkMin, cfg.thinkVar, cfg.run_id, cfg.adjMatrix[0]) {
 
     metrics.nodeVisitCounts.resize(cfg.numServers);
     metrics.serverDemands.resize(cfg.numServers);
     metrics.serverResponseTimes.resize(cfg.numServers);
 
+    file_name = "main_" + (char)cfg.run_id;
     for(int i=0;i<cfg.users;i++) {
         schedule(cfg.ease_in*i/cfg.users + rng.exponential(0.005), LEAVE_CLIENT, client.route(), i);
     }
@@ -161,7 +162,7 @@ SimMetrics getTheoreticalResults(Config sim_config, vector<ServerConfig> sfgs) {
     visits[0] = 1;
     vector<double> curr_out(sim_config.numServers + 1);
     for (int i = 0; i <= sim_config.numServers; i++) {
-
+        
     }
 }
 
@@ -176,7 +177,7 @@ int main() {
 
     for(int r=0;r<cfg.runs;r++) {
         cfg.run_id = r + 1;
-        Simulation sim(cfg, r+1);
+        Simulation sim(cfg);
         sim.run();
         auto m = sim.results();
         // resp.push_back(m.avgResp);

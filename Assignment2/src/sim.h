@@ -59,6 +59,7 @@ struct Config {
     Time timeout;
     Time thinkMin;
     Time thinkVar;
+    bool sys_other = false;
 
     int runs = 10;
     Config() = default;
@@ -140,9 +141,10 @@ class Simulation {
 
     double respSum = 0.0;
     int respCount = 0;
+    string file_name;
 
 public:
-    Simulation(Config c, unsigned seed);
+    Simulation(Config c);
     Time thinkTime();
 
     void schedule(Time t, EventTypes type, int sId, int reqId, int coreId = -1);

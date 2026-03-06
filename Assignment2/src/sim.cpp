@@ -82,7 +82,7 @@ Simulation::Simulation(Config c) : cfg(c), rng(cfg.run_id), client(cfg.users, cf
     metrics.serverDemands.resize(cfg.numServers);
     metrics.serverResponseTimes.resize(cfg.numServers);
 
-    file_name = "main_" + (char)cfg.run_id;
+    log_file.open("main_" + to_string(cfg.run_id));
     for(int i=0;i<cfg.users;i++) {
         schedule(cfg.ease_in*i/cfg.users + rng.exponential(0.005), LEAVE_CLIENT, client.route(), i);
     }
@@ -94,6 +94,7 @@ void Simulation::schedule(Time t, EventTypes type, int sId, int reqId, int coreI
 
 void Simulation::scheduleThink(int user, Time base) {
     schedule(base+thinkTime(), LEAVE_CLIENT, client.route(), user);
+    // printLog(); // ?
 }
 
 Request& Simulation::getRequest(int reqId) {
@@ -117,8 +118,11 @@ void Simulation::run() {
             case LEAVE_CLIENT: servers[e.serverId].processEvent(Event(e.time, ENTER_SERVER, e.serverId, -1, lastReqId+1));
                                client.visitCount++;
                                requests.emplace_back(lastReqId+1, e.serverId, cfg.numServers); break;
-            case ENTER_CLIENT: scheduleThink(e.reqId, e.time); break;
+            case ENTER_CLIENT: scheduleThink(e.reqId, e.time); 
+                            //    printLog(e.time); // ?
+                               break;
             case CLIENT_TIMEOUT: scheduleThink(e.reqId, e.time); break;
+            // case SERVER_TIMEOUT: servers[e.serverId].processEvent(e); break;
         }
     }
 }
@@ -197,7 +201,10 @@ int main() {
     cout<<"Utilization: "<<accumulate(util.begin(),util.end(),0.0)/util.size()<<"\n";
 }
 
-void printLog(int runId, string filename){
-    ifstream f(filename);
-    
+void Simulation::printLog(Time time) {
+    // this is essentially going to be stats for the client node
+    // no server stats here
+    // one thing I don't get is how are we planning to do request wise stats? Do we even want to do that?
+
+    log_file << simTime() - time << "\n";
 }

@@ -25,6 +25,10 @@ Some questions:
   If the former then we need to do the analysis for each server one by one but then a few measurements don't make sense
   If the latter then how do we account for the fact that each req is going through a different path in the system
 
-- Still confused about what a delay is
+- Still confused about what a delay is : Not anymore, it's waiting time
 
-- 
+- the req id being the same might create issue in printLog. Idea: maybe maintain a different idx for printLog and print with this id 
+  (ie, the order of prints is just the order in which requests schedule a think time and not the order in which they enter the system)
+
+- just a continuation of the previous point. Scratch the old idea and consider the alternate version of updateMetrics and 
+  maybe have an option between both. If you don't want to track the path through the network, then can go by the typical version o/w the event argument version

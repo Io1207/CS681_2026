@@ -12,13 +12,13 @@ Server::Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed) :
 	sumTotalInServer(0),
 	rng(seed)
 {
-	file_name = "server_" + (char) id; // change
+	log_file.open("server_" + to_string(id));
 }
 
 void Server::processEvent(const Event& e)
 {
 	Request& req = sim.getRequest(e.reqId);
-	int calling_event;
+	int calling_event = -1;
 	switch(e.type)
 	{
 		// case ENTER_SERVER: EnterServer(req); calling_event = 0; break;
@@ -29,9 +29,13 @@ void Server::processEvent(const Event& e)
 		case CTX_SWITCH_IN:	CtxSwitchIn(req, e); break;
 		case CTX_SWITCH_OUT: CtxSwitchOut(req, e); break;
 		case FINISH_SERVICE: FinishService(req, e); break;
+
+		// case SERVER_TIMEOUT: ServerTimeout(req); calling_event = 4; break;
 	}
-	// update metrics depends on which event calls it, right?
-	updateMetrics();
+	// update metrics depends on which event calls it, right? if we want to trace the path throughout the system,
+	// then we need reqId and event type to know which metric to update. For example, if it's a finish service event, then we know the request is leaving the server, so we can update the active time and in server time accordingly. If it's a ctx switch in or out, then we know the request is still in the server, so we can update the active time and in server time accordingly. If it's an enter server event, then we know the request is entering the server, so we can update the active time and in server time accordingly.
+	// updateMetrics(e);
+	updateMetrics(calling_event);
 }
 
 void Server::EnterServer(Request& req)
@@ -56,11 +60,19 @@ void Server::EnterServer(Request& req)
 	}
 
 	// Schedule SERVER_TIMEOUT
+	/*
+		AS:
+		I think this is a bad way to implement server timeouts, it would be better 
+		to handle this in the same way as client timeouts: if the amt of time a core has
+		been kept busy by this request exceeds the timeout, then mark the request as timed 
+		out, call finish service, ctx switch out, schedule client enter event
+	*/
 	sim.schedule(sim.simTime() + cfg.timeout, 
 				SERVER_TIMEOUT, 
 				serverId, 
 				req.id,
 				-1);
+
 	if(idealCore == -1)
 	{
 		// All threads busy
@@ -85,7 +97,7 @@ void Server::EnterServer(Request& req)
 	}
 	else 
 	{
-		req.coreStartTimes[serverId] = sim.simTime();
+		// req.coreStartTimes[serverId] = sim.simTime();
 		// Assign to a thread 
 		coreQueue[idealCore].push(req.id);
 
@@ -108,6 +120,8 @@ void Server::CtxSwitchIn(Request& req, const Event& e)
 	int core = e.coreId;
 	if(coreQueue[core].front() != req.id)
 		throw "Mismatching Event and Core Queue";
+
+	// is this not a redundant check?
 	if(req.serverTimedOut) {
 		bad++;
 		req.timedOut = true;
@@ -121,6 +135,9 @@ void Server::CtxSwitchIn(Request& req, const Event& e)
 		assignThread(core);
 		return;
 	}
+
+	s_timeout(req, e);
+
 	if(req.remService < cfg.roundRobinTimeout)
 	{
 		// Schedule Finish Service
@@ -130,9 +147,17 @@ void Server::CtxSwitchIn(Request& req, const Event& e)
 					req.id, 
 					e.coreId);
 	}	
-	else 
+	else // round robin timeout b4 service completes
 	{
 		// Schedule ctx switch out
+		// if (sim.simTime() - req.serviceStartTimes[serverId] > cfg.timeout) {
+		// 	req.timedOut = true;
+		// 	bad++;
+		// 	req.setReturnStatus(S_TIMEOUT);
+		// 	processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, e.coreId, req.id));
+		// 	return;
+		// }
+
 		sim.schedule(sim.simTime() + cfg.roundRobinTimeout, 
 					CTX_SWITCH_OUT, 
 					serverId, 
@@ -227,8 +252,7 @@ void Server::FinishService(Request& req, const Event& e)
 			nextServer = i;
 			break;
 		}
-		else 
-			rnd -= cfg.outProbs[i];
+		else rnd -= cfg.outProbs[i];
 	}
 
 	if(nextServer == -1)
@@ -278,13 +302,28 @@ void Server::FinishService(Request& req, const Event& e)
 	// }
 }
 
-void Server::ServerTimeout(Request& req)
-{
-	if(req.activeServer == serverId)
-		req.serverTimedOut = true;
+// void Server::ServerTimeout(Request& req, int core)
+// {
+// 	req.timedOut = true;
+// 	bad++;
+// 	req.setReturnStatus(S_TIMEOUT);
+// 	processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, core, req.id));
+// }
+
+
+void Server::s_timeout(Request& req, const Event& e) {
+	if (sim.simTime() - req.serviceStartTimes[serverId] > cfg.timeout){
+		req.timedOut = true;
+		bad++;
+		req.setReturnStatus(S_TIMEOUT);
+		processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, e.coreId, req.id));
+	}
+	return;
 }
 
-void Server::updateMetrics(int calling_event = 0)
+
+
+void Server::updateMetrics(int calling_event)
 {
 	totalActiveTime += numCoresActive * (sim.simTime() - lastEvent);
 	sumTotalInServer += totalInServer * (sim.simTime() - lastEvent);
@@ -299,7 +338,25 @@ void Server::updateMetrics(int calling_event = 0)
 	}
 	totalInServer += threadQueue.size();
 
-	ofstream f(file_name);
-	f <<  getAvgServiceTime() << "," << (char)getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
+	log_file <<  getAvgServiceTime() << "," << (char)getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
+	return;
+}
+
+void Server::updateMetrics(const Event& e)
+{
+	totalActiveTime += numCoresActive * (sim.simTime() - lastEvent);
+	sumTotalInServer += totalInServer * (sim.simTime() - lastEvent);
+
+	numCoresActive = 0;
+	totalInServer = 0;
+	for(int i=0;i<cfg.numCores;i++)
+	{
+		if(coreQueue[i].size() > 0)
+			numCoresActive++;
+		totalInServer += coreQueue[i].size();
+	}
+	totalInServer += threadQueue.size();
+
+	log_file << e.reqId << "," << getAvgServiceTime() << "," << (char)getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
 	return;
 }

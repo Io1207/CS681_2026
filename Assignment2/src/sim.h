@@ -13,10 +13,17 @@
 
 #include "servers.h" 
 
-
 using namespace std;
 
 using Time = double;
+using return_status = int;
+
+enum return_status {
+    GOOD = 0,
+    C_TIMEOUT = 1,
+    S_TIMEOUT = 2,
+    DROP = 3
+};
 
 struct Request
 {
@@ -27,9 +34,10 @@ struct Request
     bool timedOut = false;
     bool completed = false;
     bool serverTimedOut = false;
+    int ret;
 
     vector<Time> serviceStartTimes;
-    vector<Time> coreStartTimes;
+    // vector<Time> coreStartTimes;
     vector<Time> serviceTimes;
     vector<Time> serviceResponseTimes;
     vector<Time> serviceTimes;
@@ -40,12 +48,18 @@ struct Request
     {
         serviceStartTimes.resize(serverCount+1, -1);
         serviceResponseTimes.resize(serverCount+1, 0);
-        coreStartTimes.resize(serverCount+1, -1);
+        // coreStartTimes.resize(serverCount+1, -1);
         serviceTimes.resize(serverCount+1, 0);
 
         activeServer = -1;
         remService = 0;
     }
+
+    void setReturnStatus(return_status ret) {
+        this->ret = ret;
+    }
+
+    ~Request() {}
 };
 
 struct Config {
@@ -59,6 +73,8 @@ struct Config {
     Time timeout;
     Time thinkMin;
     Time thinkVar;
+
+    // up for discussion for different simulation
     bool sys_other = false;
 
     int runs = 10;
@@ -141,20 +157,27 @@ class Simulation {
 
     double respSum = 0.0;
     int respCount = 0;
-    string file_name;
+    ofstream log_file;
 
-public:
-    Simulation(Config c);
-    Time thinkTime();
+    private:
+        void printLog(Time reqTime);
 
-    void schedule(Time t, EventTypes type, int sId, int reqId, int coreId = -1);
-    void scheduleThink(int user, Time base);
-    void run();
-    Request& getRequest(int reqId);
-    Time simTime();
-    SimMetrics results();
+        Time thinkTime();
+        void scheduleThink(int user, Time base);
 
-    void printResults(string filename);
+    public:
+        Simulation(Config c);
+        ~Simulation() {
+            log_file.close();
+        }
+
+        void run();
+        Request& getRequest(int reqId); // not even used
+        Time simTime();
+        SimMetrics results();
+
+        void schedule(Time t, EventTypes type, int sId, int reqId, int coreId = -1);
+
 };
 
 

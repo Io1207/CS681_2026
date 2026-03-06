@@ -11,6 +11,15 @@ we run ```run.py``` and supply to it an easier form of the config file which is 
 
 3. ```make_config```: this functions makes the basic directory structure of the results for the specific test and the basic information for the general configuration of the simulation come form here
 
-(to be added)
-
 4. ```welch_cutoff```: this will be done just for the whole server logs. The individual servers may or may not have the same number of samples from a run and I have run out of patience and surrendered to the power of eyeballing
+
+
+### ```server.h and server.cpp```
+
+- Server Class
+    
+    1. ```processEvent```: handles intra server ops such as ctxt switch in/out, starting/finishing service, timeouts (both client and server)
+
+    2. ```updateMetrics```: writes into the log_file; what do we want? I think service time of req, avg 
+
+-

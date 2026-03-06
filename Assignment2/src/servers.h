@@ -58,11 +58,16 @@ class Server {
 	Time lastEvent;
 	Time totalActiveTime;
 	Time sumTotalInServer;
-	string file_name; // change
+
+	// string file_name; // change
+	ofstream log_file;
 
 public:
 
 	Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed);
+	~Server() {
+		log_file.close();
+	}
 
 	double serviceTime() {
 		if(cfg.serviceDist == ServerConfig::CONST)
@@ -80,29 +85,27 @@ public:
 
 	int getVisits() const { return numReqs;}
 
-	double getAvgResponseTime() const
-	{
+	double getAvgResponseTime() const {
 		return accumulate(responseTimes.begin(), responseTimes.end(), 0.0) / (responseTimes.size() + 1e-9);
 	}
 
-	double getAvgServiceTime() const
-	{
+	double getAvgServiceTime() const {
 		return accumulate(serviceTimes.begin(), serviceTimes.end(), 0.0) / (serviceTimes.size() + 1e-9);
 	}
 
 	double getUtilisation() const {return totalActiveTime / (cfg.numCores * sim.simTime());}
 	double getAvgInServer() const {return sumTotalInServer / (sim.simTime());}
-	
-
 
 private:
 	void EnterServer(Request& req);
 	void CtxSwitchIn(Request& req, const Event& e);
 	void CtxSwitchOut(Request& req, const Event& e);
 	void FinishService(Request& req, const Event& e);
-	void ServerTimeout(Request& req);
+
+	// void ServerTimeout(Request& req, int core);
 
 	void updateMetrics(int calling_event);   // Updates time averages indicators
+	void updateMetrics(const Event& e);   // fix (<-noun, not a verb) option 2
 
 	void assignThread(int core)
 	{
@@ -110,7 +113,7 @@ private:
 		{
 			int newReq = threadQueue.front(); threadQueue.pop();
 			Request& req = sim.getRequest(newReq);
-			req.coreStartTimes[serverId] = sim.simTime();
+			// req.coreStartTimes[serverId] = sim.simTime();
 			coreQueue[core].push(newReq);
 		}
 
@@ -125,4 +128,6 @@ private:
 
 		}
 	}
+
+	void s_timeout(Request& req, const Event& e);
 };

@@ -18,8 +18,17 @@ we run ```run.py``` and supply to it an easier form of the config file which is 
 
 - Server Class
     
-    1. ```processEvent```: handles intra server ops such as ctxt switch in/out, starting/finishing service, timeouts (both client and server)
+    1. ```processEvent```: handles intra server ops such as ctxt switch in/out, starting/finishing service, timeouts (both client and server). Types of events are listed below
+
+        1. ```ENTER_SERVER```: allocs thread/ queues the req for a thread
+        2. ```CTX_SWITCH_IN```: when a core finally starts working on some request
+        3. ```
 
     2. ```updateMetrics```: writes into the log_file; what do we want? I think service time of req, avg 
 
--
+
+- Server Config
+
+    If you do not understand this, take a break, dunk your face in ice cold water and try again
+
+- 

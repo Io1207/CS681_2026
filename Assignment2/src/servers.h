@@ -1,12 +1,6 @@
 #pragma once 
 
-#include <iostream>
-#include <vector>
-#include <queue>
-#include <random>
-#include <cmath>
-#include <numeric>
-#include <algorithm>
+#include "common.h"
 
 using namespace std;
 
@@ -16,6 +10,7 @@ struct ServerConfig {
 	unsigned int numCores;
 	unsigned int maxThreads;
 	unsigned int maxQueue;
+	unsigned int threadBuffer;
     enum Dist { CONST, UNIFORM, EXP } serviceDist = EXP;
 
 	Time contextSwitchTime;
@@ -26,9 +21,10 @@ struct ServerConfig {
 	vector<double> outProbs;
 };
 
-struct Event;
-class Simulation;
-class Request;
+struct Thread {
+	int reqId;
+	int coreId = -1;
+};
 
 class Server {
 	using Time = double;
@@ -61,6 +57,8 @@ class Server {
 
 	// string file_name; // change
 	ofstream log_file;
+	string threads = string("0") * cfg.maxThreads;
+	vector<Thread> threadInfo;
 
 public:
 
@@ -101,6 +99,8 @@ private:
 	void CtxSwitchIn(Request& req, const Event& e);
 	void CtxSwitchOut(Request& req, const Event& e);
 	void FinishService(Request& req, const Event& e);
+	void ServerTimeout(Request& req);
+	
 
 	// void ServerTimeout(Request& req, int core);
 

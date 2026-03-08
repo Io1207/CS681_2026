@@ -38,7 +38,7 @@ Config::Config(string filename) {
     for(int i=1; i<=numServers; i++) {
         ServerConfig &s = scfgs[i];
 
-        f >> s.numCores >> s.maxThreads >> s.maxQueue;
+        f >> s.numCores >> s.maxThreads >> s.threadBuffer >> s.maxQueue;
         
         int dist;
         f >> dist >> s.serviceMin >> s.serviceVar;
@@ -111,6 +111,10 @@ Time Simulation::thinkTime() {
 
 void Simulation::run() {
     while (!fel.empty()) {
+        if (client.visitCount >= cfg.numDelays) {
+            fel = {};
+            break;
+        }
         Event e = fel.top();
         fel.pop();
         int lastReqId = requests.size();
@@ -125,6 +129,12 @@ void Simulation::run() {
             // case SERVER_TIMEOUT: servers[e.serverId].processEvent(e); break;
         }
     }
+}
+
+void Simulation::clientTimeout(Request& req) {
+    // This is called when a request times out at the client node. We need to schedule the next think time for this user.
+    req.timedOut = true;
+    scheduleThink(req.user, simTime());
 }
 
 SimMetrics Simulation::results() {

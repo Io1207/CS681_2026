@@ -7,20 +7,23 @@ def get_server_config(num_servers, f : io.TextIOWrapper):
     # now will ask for server details one by one
     for i in range(num_servers):
         print(f"Enter details for server {i+1} like this: ")
-        print(f"numCores maxThreads maxQueue dist serviceMin")
+        print(f"numCores maxThreads threadBuffer maxQueue dist serviceMin")
         print(f" serviceVar contextSwitchTime roundRobinTimeout timeout")
         f.write(str(input()).strip() + "\n")
         f.write(str(input()).strip() + "\n")
 
 def make_adjacency_matrix(num_servers, f : io.TextIOWrapper):
     # I am lazy and would prefer to not have to write the adjacency matrix myself
+    print("enter the outProbs for the each server after it's id is printed like this: ")
+    print("sId1 outProbcurr->sId1 outProbcurr->sId2 ... outProbcurr->sIdn")
     adj_matrix = np.zeros((num_servers, num_servers), dtype = float)
     for j in range(num_servers+1):
+        print("Emmission matrix for server", j)
         response = str(input()).strip()
         parts = response.split()
         n = int(len(parts)/2)
         for i in range(n):
-            adj_matrix[0][parts[i*2]] = parts[i*2 + 1]
+            adj_matrix[j][parts[i*2]] = parts[i*2 + 1]
 
     for i in range(len(num_servers)):
         for j in range(len(num_servers)):
@@ -47,7 +50,6 @@ def make_config():
         get_server_config(num_servers,f)
     
     f.close()
-
     os.system(f"cd ../../")
 
 def run_sim(num_runs):

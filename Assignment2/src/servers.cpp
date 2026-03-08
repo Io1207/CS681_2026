@@ -13,6 +13,7 @@ Server::Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed) :
 	rng(seed)
 {
 	log_file.open("server_" + to_string(id));
+	threadInfo.resize(cfg.threadBuffer);
 }
 
 void Server::processEvent(const Event& e)
@@ -21,16 +22,13 @@ void Server::processEvent(const Event& e)
 	int calling_event = -1;
 	switch(e.type)
 	{
-		// case ENTER_SERVER: EnterServer(req); calling_event = 0; break;
-		// case CTX_SWITCH_IN:	CtxSwitchIn(req, e); calling_event = 1; break;
-		// case CTX_SWITCH_OUT: CtxSwitchOut(req, e); calling_event = 2; break;
-		// case FINISH_SERVICE: FinishService(req, e); calling_event = 3; break;
 		case ENTER_SERVER: EnterServer(req); break;
-		case CTX_SWITCH_IN:	CtxSwitchIn(req, e); break;
-		case CTX_SWITCH_OUT: CtxSwitchOut(req, e); break;
 		case FINISH_SERVICE: FinishService(req, e); break;
 
-		// case SERVER_TIMEOUT: ServerTimeout(req); calling_event = 4; break;
+		case CTX_SWITCH_IN:	CtxSwitchIn(req, e); break;
+		case CTX_SWITCH_OUT: CtxSwitchOut(req, e); break;
+
+		case SERVER_TIMEOUT: ServerTimeout(req); calling_event = 4; break;
 	}
 	// update metrics depends on which event calls it, right? if we want to trace the path throughout the system,
 	// then we need reqId and event type to know which metric to update. For example, if it's a finish service event, then we know the request is leaving the server, so we can update the active time and in server time accordingly. If it's a ctx switch in or out, then we know the request is still in the server, so we can update the active time and in server time accordingly. If it's an enter server event, then we know the request is entering the server, so we can update the active time and in server time accordingly.
@@ -48,10 +46,15 @@ void Server::EnterServer(Request& req)
 
 	int maxPerCore = cfg.maxThreads / cfg.numCores;
 	int idealCore = -1; 
+
+	/*
+		the fuck is happening here?
+	*/
 	for(int i=0;i<cfg.numCores;i++)
 	{
 		if(coreQueue[i].size() < maxPerCore )
 		{
+			// maybe initialise ideal core to 0? when would we even enter this condition
 			if(idealCore >= 0 && coreQueue[i].size() < coreQueue[idealCore].size())
 			{
 				idealCore = i;
@@ -67,11 +70,12 @@ void Server::EnterServer(Request& req)
 		been kept busy by this request exceeds the timeout, then mark the request as timed 
 		out, call finish service, ctx switch out, schedule client enter event
 	*/
-	sim.schedule(sim.simTime() + cfg.timeout, 
-				SERVER_TIMEOUT, 
-				serverId, 
-				req.id,
-				-1);
+	// sim.schedule(sim.simTime() + cfg.timeout, 
+	// 			SERVER_TIMEOUT, 
+	// 			serverId, 
+	// 			req.id,
+	// 			-1);
+	// sim.clientTimeout(req);
 
 	if(idealCore == -1)
 	{
@@ -79,7 +83,6 @@ void Server::EnterServer(Request& req)
 		// Put in thread queue
 		if(threadQueue.size() < cfg.maxQueue)
 		{
-			
 			threadQueue.push(req.id);
 		}
 		else 

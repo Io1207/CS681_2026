@@ -173,11 +173,11 @@ class Simulation {
 
         void run();
         Request& getRequest(int reqId); // not even used
+        void clientTimeout(Request& req);
         Time simTime();
         SimMetrics results();
 
         void schedule(Time t, EventTypes type, int sId, int reqId, int coreId = -1);
-
 };
 
 

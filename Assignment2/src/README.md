@@ -1,5 +1,8 @@
 "How the hell does this work?!" you might ask. I once found myself at that point during this project and then what did I do? I fought the urge to smash something on my head or my head on something and instead started writing this document so that I can use it when I am 70 and still working on this assignment.
 
+# Assumptions
+1. ```timerInterrupt``` takes negligible amt of time
+
 ## The Flow
 
 ### ```run.py```
@@ -22,7 +25,7 @@ we run ```run.py``` and supply to it an easier form of the config file which is 
 
         1. ```ENTER_SERVER```: allocs thread/ queues the req for a thread
         2. ```CTX_SWITCH_IN```: when a core finally starts working on some request
-        3. ```
+        3. ```SERVER_TIMEOUT```: Now get this through that smooth brain as yours, server timeout pe you send a bad response. That response will trigger the think
 
     2. ```updateMetrics```: writes into the log_file; what do we want? I think service time of req, avg 
 

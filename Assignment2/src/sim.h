@@ -16,13 +16,13 @@
 using namespace std;
 
 using Time = double;
-using return_status = int;
 
 enum return_status {
-    GOOD = 0,
-    C_TIMEOUT = 1,
-    S_TIMEOUT = 2,
-    DROP = 3
+    GOOD,
+    C_TIMEOUT,
+    S_TIMEOUT,
+    DROP,
+    NOT_SET
 };
 
 struct Request
@@ -37,8 +37,8 @@ struct Request
     bool timedOut = false;
     bool completed = false;
     bool serverTimedOut = false;
-    int ret;
-    Time serciveTime;
+    return_status ret = NOT_SET;
+    Time serviceTime;
 
     vector<Time> serviceStartTimes;
     // vector<Time> coreStartTimes;
@@ -145,7 +145,6 @@ struct Event
 class Simulation {
     Config cfg;
     RNG rng;
-    Time now = 0.0;
     ClientNode client;
     SimMetrics metrics;
 
@@ -163,7 +162,6 @@ class Simulation {
     int dropped = 0;
 
     double respSum = 0.0;
-    int respCount = 0;
     ofstream log_file;
 
     private:
@@ -173,6 +171,7 @@ class Simulation {
         void scheduleThink(int user, Time base);
 
     public:
+        Time now = 0.0;
         Simulation(Config c);
         ~Simulation() {
             log_file.close();

@@ -12,7 +12,6 @@ struct ServerConfig {
     enum Dist { CONST, UNIFORM, EXP } serviceDist = EXP;
 
 	Time contextSwitchTime = 0.000005;
-	Time timerInterrupt = 0.000001;
 	Time roundRobinTimeout;
 	Time serviceMin = 0.005;
     Time serviceVar = 0.01;
@@ -52,8 +51,8 @@ class Server {
 	Time sumTotalInServer;
 
 	ofstream log_file;
-	string threads = string("0") * cfg.maxThreads;
-	string coreQC = string("0") * cfg.numCores;
+	vector<Thread> threadInfo;
+	vector<int> coreQC;
 	vector<Thread> threadInfo;
 
 public:

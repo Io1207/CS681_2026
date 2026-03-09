@@ -122,6 +122,7 @@ void Simulation::run() {
         }
         e = fel.top();
         fel.pop();
+        now = e.time;
         int lastReqId = requests.size();
         switch (e.type) {
             case LEAVE_CLIENT: servers[e.serverId].processEvent(Event(e.time, ENTER_SERVER, e.serverId, lastReqId+1));
@@ -133,6 +134,7 @@ void Simulation::run() {
                                break;
             case ENTER_SERVER: servers[e.serverId].processEvent(e); break;
             case CLIENT_TIMEOUT: clientTimeout(getRequest(e.reqId)); scheduleThink(e.reqId, e.time); break;
+            default: servers[e.serverId].processEvent(e); break;
             // case SERVER_TIMEOUT: servers[e.serverId].processEvent(e); break;
         }
     }

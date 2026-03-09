@@ -6,6 +6,7 @@
 #include <numeric>
 #include <algorithm>
 #include <assert.h>
+#include <string>
 
 using namespace std;
 

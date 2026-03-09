@@ -78,16 +78,19 @@ Time ClientNode::thinkTime() {
     return thinkMin + rng.lognormal(0.0, thinkVar);
 }
 
-Simulation::Simulation(Config c) : cfg(c), rng(cfg.run_id), client(cfg.users, cfg.thinkMin, cfg.thinkVar, cfg.run_id, cfg.adjMatrix[0]) {
+Simulation::Simulation(Config c) : cfg(c), rng(cfg.run_id), 
+                                   client(cfg.users, cfg.thinkMin, cfg.thinkVar, cfg.run_id, cfg.adjMatrix[0]) {
     metrics.nodeVisitCounts.resize(cfg.numServers);
     metrics.serverDemands.resize(cfg.numServers);
     metrics.serverResponseTimes.resize(cfg.numServers);
 
     log_file.open("main_" + to_string(cfg.run_id));
+    now = 0.0;
+    Time lastScheduled = 0.0;
     for(int i=0;i<cfg.users;i++) {
-        now = cfg.ease_in*i/cfg.users + rng.exponential(0.005);
+        lastScheduled += rng.exponential(double(cfg.users)/cfg.ease_in);
         requests.emplace_back(i+1, i, cfg.numServers);
-        schedule(now, LEAVE_CLIENT, client.route(), i);
+        schedule(lastScheduled, LEAVE_CLIENT, client.route(), i);
     }
 }
 

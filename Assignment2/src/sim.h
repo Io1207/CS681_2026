@@ -16,7 +16,6 @@
 using namespace std;
 
 using Time = double;
-using return_status = int;
 
 enum return_status {
     GOOD = 0,
@@ -38,7 +37,7 @@ struct Request
     bool completed = false;
     bool serverTimedOut = false;
     int ret;
-    Time serciveTime;
+    Time serviceTime;
 
     vector<Time> serviceStartTimes;
     // vector<Time> coreStartTimes;

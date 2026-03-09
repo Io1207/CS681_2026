@@ -12,7 +12,6 @@ struct ServerConfig {
     enum Dist { CONST, UNIFORM, EXP } serviceDist = EXP;
 
 	Time contextSwitchTime = 0.000005;
-	Time timerInterrupt = 0.000001;
 	Time roundRobinTimeout;
 	Time serviceMin = 0.005;
     Time serviceVar = 0.01;
@@ -94,6 +93,7 @@ private:
 	void CtxSwitchIn(const Event& e);
 	void CtxSwitchOut(const Event& e);
 	void FinishService(const Event& e);
+	void ServerTimeout(const Event& e);
 
 	int routeNext() {
 		int nextServer = -1;

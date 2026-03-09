@@ -27,14 +27,18 @@ enum return_status {
 
 struct Request
 {
+    static int ctr;
     int id;
     int user;
     Time start = -1;
     Time completion = -1;
+    Time c_timeout;
+    
     bool timedOut = false;
     bool completed = false;
     bool serverTimedOut = false;
     int ret;
+    Time serciveTime;
 
     vector<Time> serviceStartTimes;
     // vector<Time> coreStartTimes;
@@ -44,8 +48,8 @@ struct Request
     int activeServer;
     Time remService;
 
-    Request(int id, int user, int serverCount) : id(id), user(user)
-    {
+    Request(int id, int user, int serverCount, Time ttl) : user(user), c_timeout(ttl) {
+        ctr++;
         serviceStartTimes.resize(serverCount+1, -1);
         serviceResponseTimes.resize(serverCount+1, 0);
         // coreStartTimes.resize(serverCount+1, -1);
@@ -89,6 +93,7 @@ class ClientNode {
     RNG rng;
     vector<pair<int,double>> outProbs;
     public:
+        Time timeoutOverhead = 0.001;
         int visitCount = 0;
         ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> outProbs);
         Time thinkTime();
@@ -132,7 +137,9 @@ struct Event
     int reqId;
     bool operator>(Event const& o) const { return time > o.time; }
     Event() = default;
-    Event(Time time, EventTypes type, int serverId, int coreId, int reqId) : time(time), type(type), serverId(serverId), coreId(coreId), reqId(reqId) {}
+    Event(Time time, EventTypes type, int serverId, int reqId, int core = -1) : time(time), type(type), serverId(serverId), coreId(coreId), reqId(reqId) {
+        coreId = core;
+    }
 };
 
 class Simulation {
@@ -172,7 +179,7 @@ class Simulation {
         }
 
         void run();
-        Request& getRequest(int reqId); // not even used
+        Request& getRequest(int reqId);
         void clientTimeout(Request& req);
         Time simTime();
         SimMetrics results();

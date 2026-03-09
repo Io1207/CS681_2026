@@ -16,6 +16,8 @@ map<double, double> confidenceIntervals = {
     {0.85, 1.44}
 };
 
+int Request::ctr = 0;
+
 Config::Config(string filename) {
     ifstream f(filename);
     if (!f.is_open()) {
@@ -77,14 +79,15 @@ Time ClientNode::thinkTime() {
 }
 
 Simulation::Simulation(Config c) : cfg(c), rng(cfg.run_id), client(cfg.users, cfg.thinkMin, cfg.thinkVar, cfg.run_id, cfg.adjMatrix[0]) {
-
     metrics.nodeVisitCounts.resize(cfg.numServers);
     metrics.serverDemands.resize(cfg.numServers);
     metrics.serverResponseTimes.resize(cfg.numServers);
 
     log_file.open("main_" + to_string(cfg.run_id));
     for(int i=0;i<cfg.users;i++) {
-        schedule(cfg.ease_in*i/cfg.users + rng.exponential(0.005), LEAVE_CLIENT, client.route(), i);
+        now = cfg.ease_in*i/cfg.users + rng.exponential(0.005);
+        requests.emplace_back(i+1, i, cfg.numServers);
+        schedule(now, LEAVE_CLIENT, client.route(), i);
     }
 }
 
@@ -93,6 +96,7 @@ void Simulation::schedule(Time t, EventTypes type, int sId, int reqId, int coreI
 }
 
 void Simulation::scheduleThink(int user, Time base) {
+    requests.emplace_back(Request(Request::ctr, user, cfg.numServers, cfg.timeout));
     schedule(base+thinkTime(), LEAVE_CLIENT, client.route(), user);
     // printLog(); // ?
 }
@@ -110,22 +114,25 @@ Time Simulation::thinkTime() {
 }
 
 void Simulation::run() {
+    Event e;
     while (!fel.empty()) {
         if (client.visitCount >= cfg.numDelays) {
             fel = {};
             break;
         }
-        Event e = fel.top();
+        e = fel.top();
         fel.pop();
         int lastReqId = requests.size();
         switch (e.type) {
-            case LEAVE_CLIENT: servers[e.serverId].processEvent(Event(e.time, ENTER_SERVER, e.serverId, -1, lastReqId+1));
+            case LEAVE_CLIENT: servers[e.serverId].processEvent(Event(e.time, ENTER_SERVER, e.serverId, lastReqId+1));
+                               schedule(e.time, ENTER_SERVER, e.serverId, lastReqId+1);
                                client.visitCount++;
                                requests.emplace_back(lastReqId+1, e.serverId, cfg.numServers); break;
             case ENTER_CLIENT: scheduleThink(e.reqId, e.time); 
                             //    printLog(e.time); // ?
                                break;
-            case CLIENT_TIMEOUT: scheduleThink(e.reqId, e.time); break;
+            case ENTER_SERVER: servers[e.serverId].processEvent(e); break;
+            case CLIENT_TIMEOUT: clientTimeout(getRequest(e.reqId)); scheduleThink(e.reqId, e.time); break;
             // case SERVER_TIMEOUT: servers[e.serverId].processEvent(e); break;
         }
     }
@@ -134,7 +141,9 @@ void Simulation::run() {
 void Simulation::clientTimeout(Request& req) {
     // This is called when a request times out at the client node. We need to schedule the next think time for this user.
     req.timedOut = true;
-    scheduleThink(req.user, simTime());
+    req.setReturnStatus(C_TIMEOUT);
+    bad++;
+    scheduleThink(req.user, simTime()+client.timeoutOverhead);
 }
 
 SimMetrics Simulation::results() {

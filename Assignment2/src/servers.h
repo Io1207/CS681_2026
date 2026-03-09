@@ -5,15 +5,14 @@
 using namespace std;
 
 struct ServerConfig {
-	using Time = double;
-
 	unsigned int numCores;
 	unsigned int maxThreads;
 	unsigned int maxQueue;
 	unsigned int threadBuffer;
     enum Dist { CONST, UNIFORM, EXP } serviceDist = EXP;
 
-	Time contextSwitchTime;
+	Time contextSwitchTime = 0.000005;
+	Time timerInterrupt = 0.000001;
 	Time roundRobinTimeout;
 	Time serviceMin = 0.005;
     Time serviceVar = 0.01;
@@ -27,11 +26,8 @@ struct Thread {
 };
 
 class Server {
-	using Time = double;
-	
 	ServerConfig cfg;
 	RNG rng;
-
 	int serverId;
 	
 	queue<int> threadQueue;	
@@ -46,7 +42,7 @@ class Server {
 
     int good = 0;
     int bad = 0;
-
+	int drops = 0;
 	int numReqs = 0; 
 
 	int totalInServer = 0;
@@ -55,9 +51,9 @@ class Server {
 	Time totalActiveTime;
 	Time sumTotalInServer;
 
-	// string file_name; // change
 	ofstream log_file;
 	string threads = string("0") * cfg.maxThreads;
+	string coreQC = string("0") * cfg.numCores;
 	vector<Thread> threadInfo;
 
 public:
@@ -80,7 +76,6 @@ public:
 	int getCompleted() const { return good+bad;}
 	int getGood() const { return good;}
 	int getBad() const { return bad;}
-
 	int getVisits() const { return numReqs;}
 
 	double getAvgResponseTime() const {
@@ -96,13 +91,27 @@ public:
 
 private:
 	void EnterServer(Request& req);
-	void CtxSwitchIn(Request& req, const Event& e);
-	void CtxSwitchOut(Request& req, const Event& e);
-	void FinishService(Request& req, const Event& e);
-	void ServerTimeout(Request& req);
-	
+	void CtxSwitchIn(const Event& e);
+	void CtxSwitchOut(const Event& e);
+	void FinishService(const Event& e);
 
-	// void ServerTimeout(Request& req, int core);
+	int routeNext() {
+		int nextServer = -1;
+		double rnd = rng.uniform(0,1);
+		for(int i=0;i<cfg.outProbs.size();i++)
+		{
+			if(rnd <= cfg.outProbs[i])
+			{
+				nextServer = i;
+				break;
+			}
+			else rnd -= cfg.outProbs[i];
+		}
+
+		if(nextServer == -1)
+			throw "No Next Server";
+		return nextServer;
+	}
 
 	void updateMetrics(int calling_event);   // Updates time averages indicators
 	void updateMetrics(const Event& e);   // fix (<-noun, not a verb) option 2
@@ -129,5 +138,5 @@ private:
 		}
 	}
 
-	void s_timeout(Request& req, const Event& e);
+	void timeout(const Event& e);
 };

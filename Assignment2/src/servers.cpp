@@ -10,25 +10,28 @@ Server::Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed) :
 	totalActiveTime(0),
 	lastEvent(0),
 	sumTotalInServer(0),
-	rng(seed)
-{
+	rng(seed) {
 	log_file.open("server_" + to_string(id));
 	threadInfo.resize(cfg.threadBuffer);
+	transform(coreQC.begin(), coreQC.end(), coreQC.begin(), [](char c, int mQ = cfg.maxQueue, int cores = cfg.numCores){return (char) (int) (mQ / cores);});
+	for (int i = 0; i < cfg.maxQueue%cfg.numCores; i++) {
+		coreQC[i] = (char) ((int) coreQC[i] + 1);
+	}
 }
 
-void Server::processEvent(const Event& e)
-{
+void Server::processEvent(const Event& e) {
 	Request& req = sim.getRequest(e.reqId);
 	int calling_event = -1;
 	switch(e.type)
 	{
-		case ENTER_SERVER: EnterServer(req); break;
-		case FINISH_SERVICE: FinishService(req, e); break;
+		case ENTER_SERVER: EnterServer(req); updateMetrics(); break;
+		case FINISH_SERVICE: FinishService(e); updateMetrics(); break;
 
-		case CTX_SWITCH_IN:	CtxSwitchIn(req, e); break;
-		case CTX_SWITCH_OUT: CtxSwitchOut(req, e); break;
+		case CTX_SWITCH_IN:	CtxSwitchIn(e); updateMetrics(); break;
+		case CTX_SWITCH_OUT: CtxSwitchOut(e); updateMetrics(); break;
 
-		case SERVER_TIMEOUT: ServerTimeout(req); calling_event = 4; break;
+		// case SERVER_TIMEOUT: ServerTimeout(req); updateMetrics(); break;
+		// SERVER_TIMEOUT is handled in timeout function, no sparate case for it
 	}
 	// update metrics depends on which event calls it, right? if we want to trace the path throughout the system,
 	// then we need reqId and event type to know which metric to update. For example, if it's a finish service event, then we know the request is leaving the server, so we can update the active time and in server time accordingly. If it's a ctx switch in or out, then we know the request is still in the server, so we can update the active time and in server time accordingly. If it's an enter server event, then we know the request is entering the server, so we can update the active time and in server time accordingly.
@@ -36,19 +39,19 @@ void Server::processEvent(const Event& e)
 	updateMetrics(calling_event);
 }
 
-void Server::EnterServer(Request& req)
-{
+void Server::EnterServer(Request& req) {
 	// if(req.timedOut)	return;
 	numReqs++;
 	req.serviceStartTimes[serverId] = sim.simTime();
 	req.activeServer = serverId;
 	req.remService = serviceTime();
+	req.serciveTime = req.remService;
 
 	int maxPerCore = cfg.maxThreads / cfg.numCores;
 	int idealCore = -1; 
 
 	/*
-		the fuck is happening here?
+		the hell is happening here?
 	*/
 	for(int i=0;i<cfg.numCores;i++)
 	{
@@ -75,7 +78,6 @@ void Server::EnterServer(Request& req)
 	// 			serverId, 
 	// 			req.id,
 	// 			-1);
-	// sim.clientTimeout(req);
 
 	if(idealCore == -1)
 	{
@@ -88,7 +90,11 @@ void Server::EnterServer(Request& req)
 		else 
 		{
 			// Drop the request
-			bad++;
+			req.setReturnStatus(DROP);
+			// bad++; // according to problem statement, badput is rate of completion of timed out reqs 
+				   // so it makes sense to increment only in client timeout case
+			drops++;
+
 			//Schedule ENTER_CLIENT -- reqId of event is userId of req
 			sim.schedule(sim.simTime(), 
 						ENTER_CLIENT, 
@@ -108,47 +114,51 @@ void Server::EnterServer(Request& req)
 		if(coreQueue[idealCore].size() == 1)
 		{
 			// Schedule CTX_SWITCH_IN
-			sim.schedule(sim.simTime(), 
-						CTX_SWITCH_IN, 
-						serverId, 
-						req.id, 
-						idealCore);
+			// sim.schedule(sim.simTime(), 
+			// 			CTX_SWITCH_IN, 
+			// 			serverId, 
+			// 			req.id, 
+			// 			idealCore);
+
+			processEvent(Event(sim.simTime(), CTX_SWITCH_IN, serverId, req.id, idealCore));
 			// sim.schedule(/*add args*/);
 		}
 	}
 }
 
-void Server::CtxSwitchIn(Request& req, const Event& e)
-{
+void Server::CtxSwitchIn(const Event& e) {
 	int core = e.coreId;
+	Request& req = sim.getRequest(e.reqId);
 	if(coreQueue[core].front() != req.id)
 		throw "Mismatching Event and Core Queue";
 
 	// is this not a redundant check?
-	if(req.serverTimedOut) {
-		bad++;
-		req.timedOut = true;
-		sim.schedule(sim.simTime(), 
-						ENTER_CLIENT, 
-						0, 
-						req.user, 
-						-1);
+	// if(req.serverTimedOut) {
+	// 	bad++;
+	// 	req.timedOut = true;
+	// 	sim.schedule(sim.simTime(), 
+	// 					ENTER_CLIENT, 
+	// 					0, 
+	// 					req.user, 
+	// 					-1);
 
-		coreQueue[core].pop();
-		assignThread(core);
-		return;
-	}
+	// 	coreQueue[core].pop();
+	// 	assignThread(core);
+	// 	return;
+	// }
 
-	s_timeout(req, e);
-
-	if(req.remService < cfg.roundRobinTimeout)
+	timeout(e);
+	if (req.ret == S_TIMEOUT) return;
+	if(req.remService < cfg.roundRobinTimeout) // request will complete in the current RR slice
 	{
 		// Schedule Finish Service
-		sim.schedule(sim.simTime() + req.remService, 
-					FINISH_SERVICE, 
-					serverId, 
-					req.id, 
-					e.coreId);
+		// sim.schedule(sim.simTime() + req.remService, 
+		// 			FINISH_SERVICE, 
+		// 			serverId, 
+		// 			req.id, 
+		// 			e.coreId);
+
+		processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, req.id, e.coreId));
 	}	
 	else // round robin timeout b4 service completes
 	{
@@ -157,20 +167,21 @@ void Server::CtxSwitchIn(Request& req, const Event& e)
 		// 	req.timedOut = true;
 		// 	bad++;
 		// 	req.setReturnStatus(S_TIMEOUT);
-		// 	processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, e.coreId, req.id));
+		// 	processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, req.id, e.coreId));
 		// 	return;
 		// }
-
-		sim.schedule(sim.simTime() + cfg.roundRobinTimeout, 
-					CTX_SWITCH_OUT, 
-					serverId, 
-					req.id, 
-					e.coreId);
+		// sim.schedule(sim.simTime() + cfg.roundRobinTimeout, 
+		// 			CTX_SWITCH_OUT, 
+		// 			serverId, 
+		// 			req.id, 
+		// 			e.coreId);
+		
+		processEvent(Event(sim.simTime() + cfg.roundRobinTimeout, CTX_SWITCH_OUT, serverId, req.id, e.coreId));
 	}
 }
 
-void Server::CtxSwitchOut(Request& req, const Event& e)
-{
+void Server::CtxSwitchOut(const Event& e) {
+	Request& req = sim.getRequest(e.reqId);
 	int core = e.coreId;
 	if(core < 0 || coreQueue[core].front() != req.id)
 		throw "Mismatching Event and Core Queue";
@@ -193,35 +204,40 @@ void Server::CtxSwitchOut(Request& req, const Event& e)
 		coreQueue[core].push(req.id);
 
 		// Schedule CTX_SWITCH_IN after ctx_switch time
-		sim.schedule(sim.simTime() + cfg.contextSwitchTime, 
-					CTX_SWITCH_IN, 
-					serverId, 
-					coreQueue[core].front(),
-					e.coreId);
+		// sim.schedule(sim.simTime() + cfg.contextSwitchTime, 
+		// 			CTX_SWITCH_IN, 
+		// 			serverId, 
+		// 			coreQueue[core].front(),
+		// 			e.coreId);
+
+		processEvent(Event(sim.simTime() + cfg.contextSwitchTime, CTX_SWITCH_IN, serverId, coreQueue[core].front(), e.coreId));
 	}
 	else 
 	{
 		// Schedule CTX_SWITCH_OUT after RRTime 
-		sim.schedule(sim.simTime() + cfg.roundRobinTimeout, 
-					CTX_SWITCH_OUT, 
-					serverId, 
-					req.id, 
-					e.coreId);
+		// sim.schedule(sim.simTime() + cfg.roundRobinTimeout, 
+		// 			CTX_SWITCH_OUT, 
+		// 			serverId, 
+		// 			req.id, 
+		// 			e.coreId);
+		// processEvent(Event(sim.simTime() + cfg.roundRobinTimeout, CTX_SWITCH_OUT, serverId, req.id, e.coreId));
+		if (sim.getRequest(e.reqId).remService > 0) {
+			processEvent()
+		}
 	}
 }
 
-void Server::FinishService(Request& req, const Event& e)
+void Server::FinishService(const Event& e)
 {
+	Request& req = sim.getRequest(e.reqId);
 	int core = e.coreId;
 	if(core < 0 || coreQueue[core].front() != req.id)
 		throw "Mismatching Event and Core Queue";
-	if(req.serverTimedOut) {
-		req.timedOut = true;
-		bad++;
-
+	if(req.ret == S_TIMEOUT) {
+		assert(req.timedOut);
+		drops++;
 		// AS: should we not make the timeout time the response time for the request?
 		// req.completion = sim.simTime();
-
 		sim.schedule(sim.simTime(), 
 						ENTER_CLIENT, 
 						0, 
@@ -234,37 +250,23 @@ void Server::FinishService(Request& req, const Event& e)
 	req.remService = 0;
 
 	Time resp = e.time - req.serviceStartTimes[serverId];
-	Time serv = e.time - req.serviceTimes[serverId];
+	Time serv = e.time - req.serviceTimes[serverId]; // ???
+	// Time serv = req.serciveTime;
 
 	req.serviceResponseTimes[serverId] += resp;
 	req.serviceTimes[serverId] += serv;
 
+	if (req.ret == C_TIMEOUT) bad++;
+	else good++;
 	responseTimes.push_back(resp);
 	serviceTimes.push_back(serv);
 
-	good++;
-
 	// Find next Server
-	int nextServer = -1;
-	
-	double rnd = rng.uniform(0,1);
-	for(int i=0;i<cfg.outProbs.size();i++)
-	{
-		if(rnd <= cfg.outProbs[i])
-		{
-			nextServer = i;
-			break;
-		}
-		else rnd -= cfg.outProbs[i];
-	}
 
-	if(nextServer == -1)
-		throw "No Next Server";
-
-	req.activeServer = nextServer;
+	req.activeServer = routeNext();
 
 	coreQueue[core].pop();
-	if(nextServer == 0)
+	if(req.activeServer == 0)
 	{
 		req.completed = true;
 		req.completion = sim.simTime();
@@ -280,7 +282,7 @@ void Server::FinishService(Request& req, const Event& e)
 		// Schedule ENTER_SERVER
 		sim.schedule(sim.simTime(), 
 					ENTER_SERVER, 
-					nextServer, 
+					req.activeServer, 
 					req.id, 
 					-1);
 	}
@@ -305,28 +307,33 @@ void Server::FinishService(Request& req, const Event& e)
 	// }
 }
 
-// void Server::ServerTimeout(Request& req, int core)
-// {
-// 	req.timedOut = true;
-// 	bad++;
-// 	req.setReturnStatus(S_TIMEOUT);
-// 	processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, core, req.id));
-// }
 
+void Server::timeout(const Event& e) {
+	Request& req = sim.getRequest(e.reqId);
 
-void Server::s_timeout(Request& req, const Event& e) {
-	if (sim.simTime() - req.serviceStartTimes[serverId] > cfg.timeout){
+	if ((req.remService>cfg.roundRobinTimeout ? cfg.roundRobinTimeout : req.remService) + sim.simTime() - req.serviceStartTimes[serverId] > req.c_timeout) {
 		req.timedOut = true;
-		bad++;
+		req.setReturnStatus(C_TIMEOUT);
+		// bad++;
+		updateMetrics(e);
+		sim.schedule(
+			req.serviceStartTimes[serverId] + req.c_timeout,
+			CLIENT_TIMEOUT,
+			serverId,
+			req.id);
+	}
+
+	else if (sim.simTime() - req.serviceStartTimes[serverId] > cfg.timeout){
+		req.timedOut = true;
+		req.serviceTimes[serverId-1] += sim.simTime() - req.serviceStartTimes[serverId];
 		req.setReturnStatus(S_TIMEOUT);
-		processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, e.coreId, req.id));
+		updateMetrics(e);
+		processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, req.id, e.coreId));
 	}
 	return;
 }
 
-
-
-void Server::updateMetrics(int calling_event)
+void Server::updateMetrics(int calling_event = 0)
 {
 	totalActiveTime += numCoresActive * (sim.simTime() - lastEvent);
 	sumTotalInServer += totalInServer * (sim.simTime() - lastEvent);

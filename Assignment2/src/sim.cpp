@@ -18,6 +18,11 @@ map<double, double> confidenceIntervals = {
 
 int Request::ctr = 0;
 
+Time Simulation::sampleClientTimeout()
+{
+    return cfg.timeoutMin + rng.lognormal(0.0, cfg.timeoutVar);
+}
+
 Config::Config(string filename) {
     ifstream f(filename);
     if (!f.is_open()) {
@@ -25,7 +30,7 @@ Config::Config(string filename) {
     }
     f >> numDelays;
     f >> users;
-    f >> ease_in >> timeout >> thinkMin >> thinkVar;
+    f >> ease_in >> timeoutMin >> timeoutVar >> thinkMin >> thinkVar;
     f >> numServers;
 
     adjMatrix.resize(numServers+1);
@@ -89,17 +94,17 @@ Simulation::Simulation(Config c) : cfg(c), rng(cfg.run_id),
     Time lastScheduled = 0.0;
     for(int i=0;i<cfg.users;i++) {
         lastScheduled += rng.exponential(double(cfg.users)/cfg.ease_in);
-        requests.emplace_back(i+1, i, cfg.numServers);
+        requests.emplace_back(i+1, i, cfg.numServers, sampleClientTimeout());
         schedule(lastScheduled, LEAVE_CLIENT, client.route(), i);
     }
 }
 
-void Simulation::schedule(Time t, EventTypes type, int sId, int reqId, int coreId = -1) {
+void Simulation::schedule(Time t, EventTypes type, int sId, int reqId, int coreId) {
     fel.push({t, type, sId, coreId, reqId});
 }
 
 void Simulation::scheduleThink(int user, Time base) {
-    requests.emplace_back(Request(Request::ctr, user, cfg.numServers, cfg.timeout));
+    requests.emplace_back(Request::ctr, user, cfg.numServers, sampleClientTimeout());
     schedule(base+thinkTime(), LEAVE_CLIENT, client.route(), user);
     // printLog(); // ?
 }
@@ -131,7 +136,7 @@ void Simulation::run() {
             case LEAVE_CLIENT: servers[e.serverId].processEvent(Event(e.time, ENTER_SERVER, e.serverId, lastReqId+1));
                                schedule(e.time, ENTER_SERVER, e.serverId, lastReqId+1);
                                client.visitCount++;
-                               requests.emplace_back(lastReqId+1, e.serverId, cfg.numServers); break;
+                               requests.emplace_back(lastReqId+1, e.serverId, cfg.numServers, sampleClientTimeout()); break;
             case ENTER_CLIENT: scheduleThink(e.reqId, e.time); 
                             //    printLog(e.time); // ?
                                break;
@@ -169,6 +174,8 @@ SimMetrics Simulation::results() {
         m.serverResponseTimes[i] = m.serverResponseTimes[i] / m.nodeVisitCounts[i];
 
     }
+
+    return SimMetrics();
 }
 
 pair<double,double> meanCI(vector<double> &v, double confidence = 0.95) {
@@ -181,18 +188,18 @@ pair<double,double> meanCI(vector<double> &v, double confidence = 0.95) {
     return {m,h};
 }
 
-SimMetrics getTheoreticalResults(Config sim_config, vector<ServerConfig> sfgs) {
-    SimMetrics t_results = SimMetrics();
+// SimMetrics getTheoreticalResults(Config sim_config, vector<ServerConfig> sfgs) {
+//     SimMetrics t_results = SimMetrics();
     
-    // getting theoretical relative visits
+//     // getting theoretical relative visits
 
-    vector<double> visits(sim_config.numServers + 1);
-    visits[0] = 1;
-    vector<double> curr_out(sim_config.numServers + 1);
-    for (int i = 0; i <= sim_config.numServers; i++) {
+//     vector<double> visits(sim_config.numServers + 1);
+//     visits[0] = 1;
+//     vector<double> curr_out(sim_config.numServers + 1);
+//     for (int i = 0; i <= sim_config.numServers; i++) {
         
-    }
-}
+//     }
+// }
 
 int main() {
     Config cfg = Config("config.txt");
@@ -225,10 +232,10 @@ int main() {
     cout<<"Utilization: "<<accumulate(util.begin(),util.end(),0.0)/util.size()<<"\n";
 }
 
-void Simulation::printLog(Time time) {
-    // this is essentially going to be stats for the client node
-    // no server stats here
-    // one thing I don't get is how are we planning to do request wise stats? Do we even want to do that?
+// void Simulation::printLog(Time time) {
+//     // this is essentially going to be stats for the client node
+//     // no server stats here
+//     // one thing I don't get is how are we planning to do request wise stats? Do we even want to do that?
 
-    log_file << simTime() - time << "\n";
-}
+//     log_file << simTime() - time << "\n";
+// }

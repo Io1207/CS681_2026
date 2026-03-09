@@ -44,7 +44,6 @@ struct Request
     // vector<Time> coreStartTimes;
     vector<Time> serviceTimes;
     vector<Time> serviceResponseTimes;
-    vector<Time> serviceTimes;
     int activeServer;
     Time remService;
 
@@ -74,7 +73,8 @@ struct Config {
     vector<vector<double>> adjMatrix;
     vector<ServerConfig> scfgs;
     Time ease_in;
-    Time timeout;
+    Time timeoutMin;
+    Time timeoutVar;
     Time thinkMin;
     Time thinkVar;
 
@@ -100,22 +100,6 @@ class ClientNode {
         int route();
 };
 
-struct RNG {
-    mt19937 gen;
-    RNG(unsigned s) : gen(s) {}
-    double uniform(double a, double b) {
-        uniform_real_distribution<> d(a,b);
-        return d(gen);
-    }
-    double exponential(double lambda) {
-        exponential_distribution<> d(lambda);
-        return d(gen);
-    }
-    double lognormal(double m, double s) {
-        lognormal_distribution<> d(m,s);
-        return d(gen);
-    }
-};
 
 enum EventTypes {   
     LEAVE_CLIENT,
@@ -140,6 +124,19 @@ struct Event
     Event(Time time, EventTypes type, int serverId, int reqId, int core = -1) : time(time), type(type), serverId(serverId), coreId(coreId), reqId(reqId) {
         coreId = core;
     }
+};
+
+struct SimMetrics {
+    vector<int> nodeVisitCounts;
+    vector<double> serverDemands;
+    vector<double> serverResponseTimes;
+    vector<double> throughputs;
+    double util;
+    double throughput;
+    double goodput;
+    double badput;
+    double dropRate;
+    double sysResponseTime;
 };
 
 class Simulation {
@@ -168,6 +165,7 @@ class Simulation {
         void printLog(Time reqTime);
 
         Time thinkTime();
+        Time sampleClientTimeout();
         void scheduleThink(int user, Time base);
 
     public:
@@ -187,15 +185,3 @@ class Simulation {
 };
 
 
-struct SimMetrics {
-    vector<int> nodeVisitCounts;
-    vector<double> serverDemands;
-    vector<double> serverResponseTimes;
-    vector<double> throughputs;
-    double util;
-    double throughput;
-    double goodput;
-    double badput;
-    double dropRate;
-    double sysResponseTime;
-};

@@ -22,19 +22,23 @@ void Server::processEvent(const Event& e) {
 	int calling_event = -1;
 	switch(e.type)
 	{
-		case ENTER_SERVER: EnterServer(req); updateMetrics(); break;
-		case FINISH_SERVICE: FinishService(e); updateMetrics(); break;
+		case ENTER_SERVER: EnterServer(req); updateMetrics(e); break;
+		case FINISH_SERVICE: FinishService(e); updateMetrics(e); break;
 
-		case CTX_SWITCH_IN:	CtxSwitchIn(e); updateMetrics(); break;
-		case CTX_SWITCH_OUT: CtxSwitchOut(e); updateMetrics(); break;
+		case CTX_SWITCH_IN:	CtxSwitchIn(e); updateMetrics(e); break;
+		case CTX_SWITCH_OUT: CtxSwitchOut(e); updateMetrics(e); break;
 
-		case SERVER_TIMEOUT: ServerTimeout(e); updateMetrics(); break;
+		case SERVER_TIMEOUT: ServerTimeout(e); updateMetrics(e); break;
 		// SERVER_TIMEOUT is handled in timeout function, no sparate case for it
 	}
 	// update metrics depends on which event calls it, right? if we want to trace the path throughout the system,
-	// then we need reqId and event type to know which metric to update. For example, if it's a finish service event, then we know the request is leaving the server, so we can update the active time and in server time accordingly. If it's a ctx switch in or out, then we know the request is still in the server, so we can update the active time and in server time accordingly. If it's an enter server event, then we know the request is entering the server, so we can update the active time and in server time accordingly.
+	// then we need reqId and event type to know which metric to update. For example, if it's a finish service event,
+	// then we know the request is leaving the server, so we can update the active time and in server time accordingly.
+	// If it's a ctx switch in or out, then we know the request is still in the server, so we can update the active time 
+	// and in server time accordingly. If it's an enter server event, then we know the request is entering the server, so 
+	// we can update the active time and in server time accordingly.
 	// updateMetrics(e);
-	updateMetrics(calling_event);
+	// updateMetrics(calling_event);
 }
 
 void Server::EnterServer(Request& req) {
@@ -345,24 +349,24 @@ void Server::timeout(const Event& e) {
 	return;
 }
 
-void Server::updateMetrics(int calling_event = 0)
-{
-	totalActiveTime += numCoresActive * (sim.simTime() - lastEvent);
-	sumTotalInServer += totalInServer * (sim.simTime() - lastEvent);
+// void Server::updateMetrics(int calling_event = 0)
+// {
+// 	totalActiveTime += numCoresActive * (sim.simTime() - lastEvent);
+// 	sumTotalInServer += totalInServer * (sim.simTime() - lastEvent);
 
-	numCoresActive = 0;
-	totalInServer = 0;
-	for(int i=0;i<cfg.numCores;i++)
-	{
-		if(coreQueue[i].size() > 0)
-			numCoresActive++;
-		totalInServer += coreQueue[i].size();
-	}
-	totalInServer += threadQueue.size();
+// 	numCoresActive = 0;
+// 	totalInServer = 0;
+// 	for(int i=0;i<cfg.numCores;i++)
+// 	{
+// 		if(coreQueue[i].size() > 0)
+// 			numCoresActive++;
+// 		totalInServer += coreQueue[i].size();
+// 	}
+// 	totalInServer += threadQueue.size();
 
-	log_file <<  getAvgServiceTime() << "," << getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
-	return;
-}
+// 	log_file <<  getAvgServiceTime() << "," << getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
+// 	return;
+// }
 
 void Server::updateMetrics(const Event& e)
 {
@@ -379,6 +383,30 @@ void Server::updateMetrics(const Event& e)
 	}
 	totalInServer += threadQueue.size();
 
-	log_file << e.reqId << "," << getAvgServiceTime() << "," << getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
-	return;
+	// log_file << e.reqId << "," << getAvgServiceTime() << "," << getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
+}
+
+double Server::getUtilisation() const {return totalActiveTime / (cfg.numCores * sim.simTime());}
+double Server::getAvgInServer() const {return sumTotalInServer / (sim.simTime());}
+
+void Server::assignThread(int core)
+{
+	if(threadQueue.size() > 0)
+	{
+		int newReq = threadQueue.front(); threadQueue.pop();
+		Request& req = sim.getRequest(newReq);
+		// req.coreStartTimes[serverId] = sim.simTime();
+		coreQueue[core].push(newReq);
+	}
+
+	if(coreQueue[core].size() > 0)
+	{
+		// Schedule CTX_SWITCH_IN
+		sim.schedule(sim.simTime() + cfg.contextSwitchTime, 
+					CTX_SWITCH_IN, 
+					serverId, 
+					coreQueue[core].front(),
+					core);
+
+	}
 }

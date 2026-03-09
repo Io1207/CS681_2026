@@ -8,7 +8,7 @@ def get_server_config(num_servers, f : io.TextIOWrapper):
     for i in range(num_servers):
         print(f"Enter details for server {i+1} like this: ")
         print(f"numCores maxThreads threadBuffer maxQueue dist serviceMin")
-        print(f" serviceVar contextSwitchTime roundRobinTimeout timeout")
+        print(f" serviceVar contextSwitchTime roundRobinTimeout timeoutMin timeoutVar")
         f.write(str(input()).strip() + "\n")
         f.write(str(input()).strip() + "\n")
 

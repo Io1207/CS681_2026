@@ -53,7 +53,6 @@ class Server {
 	ofstream log_file;
 	vector<Thread> threadInfo;
 	vector<int> coreQC;
-	vector<Thread> threadInfo;
 
 public:
 
@@ -85,8 +84,8 @@ public:
 		return accumulate(serviceTimes.begin(), serviceTimes.end(), 0.0) / (serviceTimes.size() + 1e-9);
 	}
 
-	double getUtilisation() const {return totalActiveTime / (cfg.numCores * sim.simTime());}
-	double getAvgInServer() const {return sumTotalInServer / (sim.simTime());}
+	double getUtilisation() const;
+	double getAvgInServer() const;
 
 private:
 	void EnterServer(Request& req);
@@ -116,27 +115,7 @@ private:
 	void updateMetrics(int calling_event);   // Updates time averages indicators
 	void updateMetrics(const Event& e);   // fix (<-noun, not a verb) option 2
 
-	void assignThread(int core)
-	{
-		if(threadQueue.size() > 0)
-		{
-			int newReq = threadQueue.front(); threadQueue.pop();
-			Request& req = sim.getRequest(newReq);
-			// req.coreStartTimes[serverId] = sim.simTime();
-			coreQueue[core].push(newReq);
-		}
-
-		if(coreQueue[core].size() > 0)
-		{
-			// Schedule CTX_SWITCH_IN
-			sim.schedule(sim.simTime() + cfg.contextSwitchTime, 
-						CTX_SWITCH_IN, 
-						serverId, 
-						coreQueue[core].front(),
-						core);
-
-		}
-	}
+	void assignThread(int core);
 
 	void timeout(const Event& e);
 };

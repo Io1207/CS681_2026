@@ -46,7 +46,7 @@ class Server {
 
 	int totalInServer = 0;
 	int numCoresActive = 0;
-	Time lastEvent;
+	Time lastEvent = 0.0;
 	Time totalActiveTime;
 	Time sumTotalInServer;
 
@@ -57,6 +57,12 @@ class Server {
 public:
 
 	Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed);
+	
+	Server(const Server&) = default;
+	Server(Server&&) = default;
+	Server& operator=(const Server&) = default; 
+	Server& operator=(Server&&) = default;
+	
 	~Server() {
 		log_file.close();
 	}

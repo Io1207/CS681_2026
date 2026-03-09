@@ -16,7 +16,7 @@ map<double, double> confidenceIntervals = {
     {0.85, 1.44}
 };
 
-int Request::ctr = 0;
+// int Request::ctr = 0;
 
 Time Simulation::sampleClientTimeout()
 {
@@ -83,8 +83,9 @@ Time ClientNode::thinkTime() {
     return thinkMin + rng.lognormal(0.0, thinkVar);
 }
 
-Simulation::Simulation(Config c) : cfg(c), rng(cfg.run_id), 
-                                   client(cfg.users, cfg.thinkMin, cfg.thinkVar, cfg.run_id, cfg.adjMatrix[0]) {
+Simulation::Simulation(Config c, int seed) : cfg(c), rng(seed), 
+                                   client(cfg.users, cfg.thinkMin, cfg.thinkVar, cfg.run_id, cfg.adjMatrix[0])
+{
     metrics.nodeVisitCounts.resize(cfg.numServers);
     metrics.serverDemands.resize(cfg.numServers);
     metrics.serverResponseTimes.resize(cfg.numServers);
@@ -92,6 +93,12 @@ Simulation::Simulation(Config c) : cfg(c), rng(cfg.run_id),
     log_file.open("main_" + to_string(cfg.run_id));
     now = 0.0;
     Time lastScheduled = 0.0;
+    for(int i=0;i<cfg.numServers;i++)
+    {
+        // Server serv;
+        servers.emplace_back(i,cfg.scfgs[i],*this,rng.randInt(0,1000000000));
+    }
+
     for(int i=0;i<cfg.users;i++) {
         lastScheduled += rng.exponential(double(cfg.users)/cfg.ease_in);
         requests.emplace_back(i+1, i, cfg.numServers, sampleClientTimeout());
@@ -133,27 +140,61 @@ void Simulation::run() {
         now = e.time;
         int lastReqId = requests.size();
         switch (e.type) {
-            case LEAVE_CLIENT: servers[e.serverId].processEvent(Event(e.time, ENTER_SERVER, e.serverId, lastReqId+1));
-                               schedule(e.time, ENTER_SERVER, e.serverId, lastReqId+1);
-                               client.visitCount++;
-                               requests.emplace_back(lastReqId+1, e.serverId, cfg.numServers, sampleClientTimeout()); break;
-            case ENTER_CLIENT: scheduleThink(e.reqId, e.time); 
-                            //    printLog(e.time); // ?
-                               break;
-            case ENTER_SERVER: servers[e.serverId].processEvent(e); break;
-            case CLIENT_TIMEOUT: clientTimeout(getRequest(e.reqId)); scheduleThink(e.reqId, e.time); break;
-            default: servers[e.serverId].processEvent(e); break;
+            case LEAVE_CLIENT: 
+                servers[e.serverId].processEvent(Event(e.time, ENTER_SERVER, e.serverId, lastReqId+1));
+                schedule(e.time, ENTER_SERVER, e.serverId, lastReqId+1);
+                client.visitCount++;
+                requests.emplace_back(lastReqId+1, e.serverId, cfg.numServers, sampleClientTimeout()); 
+                requests.back().start = simTime();
+                break;
+            case ENTER_CLIENT: 
+                handleEnterClient(e, getRequest(e.reqId));
+                break;
+            case ENTER_SERVER: 
+                servers[e.serverId].processEvent(e); 
+                break;
+            case CLIENT_TIMEOUT: 
+                clientTimeout(getRequest(e.reqId)); 
+                scheduleThink(e.reqId, e.time); 
+                break;
+            default: 
+                servers[e.serverId].processEvent(e); 
+                break;
             // case SERVER_TIMEOUT: servers[e.serverId].processEvent(e); break;
         }
     }
 }
 
+void Simulation::handleEnterClient(Event& e, Request& req)
+{
+    req.completion = simTime();
+    scheduleThink(req.id, e.time); 
+    switch(req.ret)
+    {
+        case C_TIMEOUT:
+            bad++;
+            break;
+        case GOOD:
+            good++;
+            break;
+        case S_TIMEOUT:
+            dropped++;
+            break;
+        case DROP:
+            dropped++;
+            break;
+    }
+    // log
+}
+
 void Simulation::clientTimeout(Request& req) {
-    // This is called when a request times out at the client node. We need to schedule the next think time for this user.
+    // This is called when a request times out at the client node. We need to schedule the 
+    // next think time for this user.
     req.timedOut = true;
     req.setReturnStatus(C_TIMEOUT);
-    bad++;
-    scheduleThink(req.user, simTime()+client.timeoutOverhead);
+    // bad++;
+    // scheduleThink(req.user, simTime()+client.timeoutOverhead);
+    schedule(simTime(), ENTER_CLIENT, -1, req.id);
 }
 
 SimMetrics Simulation::results() {
@@ -201,7 +242,7 @@ pair<double,double> meanCI(vector<double> &v, double confidence = 0.95) {
 //     }
 // }
 
-int main() {
+int main(int argc, char* argv[]) {
     Config cfg = Config("config.txt");
     vector<double> resp;
     vector<double> thr;
@@ -210,9 +251,15 @@ int main() {
     vector<double> drop;
     vector<double> util;
 
+    int seed;
+    if(argc <= 1)
+        seed = 0;
+    else 
+        seed = stoi(argv[1]);
+
     for(int r=0;r<cfg.runs;r++) {
         cfg.run_id = r + 1;
-        Simulation sim(cfg);
+        Simulation sim(cfg, seed);
         sim.run();
         auto m = sim.results();
         // resp.push_back(m.avgResp);
@@ -220,7 +267,7 @@ int main() {
         good.push_back(m.goodput);
         bad.push_back(m.badput);
         drop.push_back(m.dropRate);
-        util.push_back(m.util);
+        // util.push_back(m.util);
     }
 
     auto [meanR,ciR] = meanCI(resp);

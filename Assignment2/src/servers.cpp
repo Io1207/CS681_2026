@@ -258,7 +258,7 @@ void Server::FinishService(const Event& e)
 	if(req.activeServer == 0)
 	{
 		req.completed = true;
-		req.completion = sim.simTime();
+		// req.completion = sim.simTime();
 		// Schedule ENTER_CLIENT -- reqId of event is userId of req
 		if(req.ret != C_TIMEOUT)
 			sim.schedule(sim.simTime(), 
@@ -306,7 +306,7 @@ void Server::ServerTimeout(const Event& e)
 	assert(req.timedOut);
 	drops++;
 	// AS: should we not make the timeout time the response time for the request?
-	req.completion = sim.simTime();
+	// req.completion = sim.simTime();
 	sim.schedule(sim.simTime(), 
 					ENTER_CLIENT, 
 					0, 
@@ -341,7 +341,7 @@ void Server::timeout(const Event& e) {
 		req.setReturnStatus(S_TIMEOUT);
 		updateMetrics(e);
 		sim.schedule(sim.simTime(),
-				 FINISH_SERVICE,
+				 SERVER_TIMEOUT,
 				 req.activeServer,
 				 e.coreId);
 		// processEvent(Event(sim.simTime(), FINISH_SERVICE, serverId, req.id, e.coreId));
@@ -382,6 +382,7 @@ void Server::updateMetrics(const Event& e)
 		totalInServer += coreQueue[i].size();
 	}
 	totalInServer += threadQueue.size();
+	lastEvent = sim.simTime();
 
 	// log_file << e.reqId << "," << getAvgServiceTime() << "," << getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
 }

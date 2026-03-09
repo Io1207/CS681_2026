@@ -27,7 +27,7 @@ enum return_status {
 
 struct Request
 {
-    static int ctr;
+    inline static int ctr = 0;
     int id;
     int user;
     Time start = -1;
@@ -92,12 +92,12 @@ class ClientNode {
     Time thinkVar;
     RNG rng;
     vector<pair<int,double>> outProbs;
-    public:
-        Time timeoutOverhead = 0.001;
-        int visitCount = 0;
-        ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> outProbs);
-        Time thinkTime();
-        int route();
+public:
+    Time timeoutOverhead = 0.001;
+    int visitCount = 0;
+    ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> outProbs);
+    Time thinkTime();
+    int route();
 };
 
 
@@ -131,7 +131,6 @@ struct SimMetrics {
     vector<double> serverDemands;
     vector<double> serverResponseTimes;
     vector<double> throughputs;
-    double util;
     double throughput;
     double goodput;
     double badput;
@@ -168,9 +167,11 @@ class Simulation {
         Time sampleClientTimeout();
         void scheduleThink(int user, Time base);
 
+        void handleEnterClient(Event& e, Request& req);
+
     public:
         Time now = 0.0;
-        Simulation(Config c);
+        Simulation(Config c, int seed);
         ~Simulation() {
             log_file.close();
         }

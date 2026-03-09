@@ -35,3 +35,18 @@ we run ```run.py``` and supply to it an easier form of the config file which is 
     If you do not understand this, take a break, dunk your face in ice cold water and try again
 
 - 
+
+## Logs
+- Each test has its own directory in `results` directory
+- Each test directory contains
+```
+{test_name}
+ |
+ |-config.txt
+ |-run_{i}
+ |  |-main.log
+ |  |-server_{i}.log
+ |
+ |-response_times.log
+ |-stats.log
+```

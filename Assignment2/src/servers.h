@@ -93,6 +93,7 @@ private:
 	void CtxSwitchIn(const Event& e);
 	void CtxSwitchOut(const Event& e);
 	void FinishService(const Event& e);
+	void ServerTimeout(const Event& e);
 
 	int routeNext() {
 		int nextServer = -1;

@@ -1,2 +1,4 @@
 ./Assignment2/src/NotesForSelf.txt
 ./Assignment2/Reference Material/*
+./.DS_Store
+./.gitignore

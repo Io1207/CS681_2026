@@ -449,7 +449,7 @@ int main(int argc, char* argv[]) {
 
     for(int r=0;r<cfg.runs;r++) {
         cfg.run_id = r + 1;
-        Simulation sim(cfg, seed+r);
+        Simulation sim(cfg, seed+r,dir_name);
         sim.run();
         auto m = sim.results();
         // resp.push_back(m.avgResp);

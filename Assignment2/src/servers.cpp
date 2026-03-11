@@ -2,7 +2,7 @@
 #include "servers.h"
 #include "common.h"
 
-Server::Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed) : 
+Server::Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed, string dirname) : 
 	serverId(id),
 	cfg(_cfg), 
 	sim(_sim), 
@@ -13,7 +13,7 @@ Server::Server(int id, ServerConfig _cfg, Simulation& _sim, unsigned seed) :
 	sumTotalInServer(0),
 	rng(seed) {
 	
-	log_file.open("server_" + to_string(id));
+	log_file.open(dirname + "/server_" + to_string(id) + ".log");
 	threadInfo.resize(cfg.threadBuffer);
 }
 
@@ -277,7 +277,7 @@ void Server::FinishService(const Event& e)
 					-1);
 	}
 
-
+	appendLog(resp, serv);
 	assignThread(core);
 	// if(threadQueue.size() > 0)
 	// {
@@ -410,4 +410,16 @@ void Server::assignThread(int core)
 					core);
 
 	}
+}
+
+void Server::appendLog(Time resp_time, Time serv_time)
+{
+	log_file << sim.simTime() << ","
+				<< good << ","
+				<< bad << ","
+				<< drops << ","
+				<< resp_time << ","
+				<< serv_time << ","
+				<< totalActiveTime << ","
+				<< sumTotalInServer << "\n";
 }

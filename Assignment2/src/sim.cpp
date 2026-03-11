@@ -1,6 +1,5 @@
 #include "sim.h"
 #include "servers.h"
-#include <map>
 
 struct Config;
 
@@ -83,20 +82,20 @@ Time ClientNode::thinkTime() {
     return thinkMin + rng.lognormal(0.0, thinkVar);
 }
 
-Simulation::Simulation(Config c, int seed) : cfg(c), rng(seed), 
+Simulation::Simulation(Config c, int seed, string dirname) : cfg(c), rng(seed), 
                                    client(cfg.users, cfg.thinkMin, cfg.thinkVar, cfg.run_id, cfg.adjMatrix[0])
 {
     metrics.nodeVisitCounts.resize(cfg.numServers);
     metrics.serverDemands.resize(cfg.numServers);
     metrics.serverResponseTimes.resize(cfg.numServers);
 
-    log_file.open("main_" + to_string(cfg.run_id));
+    log_file.open(dirname + "/run_" + to_string(cfg.run_id) + "/main.log");
     now = 0.0;
     Time lastScheduled = 0.0;
     for(int i=0;i<cfg.numServers;i++)
     {
         // Server serv;
-        servers.emplace_back(i,cfg.scfgs[i],*this,rng.randInt(0,1000000000));
+        servers.emplace_back(i,cfg.scfgs[i],*this,rng.randInt(0,1000000000), dirname + "/run_" + to_string(cfg.run_id));
     }
 
     for(int i=0;i<cfg.users;i++) {
@@ -149,6 +148,7 @@ void Simulation::run() {
                 break;
             case ENTER_CLIENT: 
                 handleEnterClient(e, getRequest(e.reqId));
+
                 break;
             case ENTER_SERVER: 
                 servers[e.serverId].processEvent(e); 
@@ -168,7 +168,7 @@ void Simulation::run() {
 void Simulation::handleEnterClient(Event& e, Request& req)
 {
     req.completion = simTime();
-    scheduleThink(req.id, e.time); 
+    scheduleThink(req.user, e.time); 
     switch(req.ret)
     {
         case C_TIMEOUT:
@@ -184,7 +184,7 @@ void Simulation::handleEnterClient(Event& e, Request& req)
             dropped++;
             break;
     }
-    // log
+    appendLog(req.completion - req.start);
 }
 
 void Simulation::clientTimeout(Request& req) {
@@ -242,8 +242,24 @@ pair<double,double> meanCI(vector<double> &v, double confidence = 0.95) {
 //     }
 // }
 
+// Arg1 - simulation directory path
+// Arg 2 - random seed
 int main(int argc, char* argv[]) {
-    Config cfg = Config("config.txt");
+    
+    int seed;
+    string dir_name;
+    if(argc <= 1)
+        dir_name = "";
+    else
+        dir_name = argv[1];
+    
+    if(argc <=2)
+        seed = 0;
+    else 
+        seed = stoi(argv[1]);
+    
+
+    Config cfg = Config(dir_name + "config.txt");
     vector<double> resp;
     vector<double> thr;
     vector<double> good;
@@ -251,15 +267,11 @@ int main(int argc, char* argv[]) {
     vector<double> drop;
     vector<double> util;
 
-    int seed;
-    if(argc <= 1)
-        seed = 0;
-    else 
-        seed = stoi(argv[1]);
+    
 
     for(int r=0;r<cfg.runs;r++) {
         cfg.run_id = r + 1;
-        Simulation sim(cfg, seed);
+        Simulation sim(cfg, seed+r);
         sim.run();
         auto m = sim.results();
         // resp.push_back(m.avgResp);

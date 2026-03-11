@@ -157,11 +157,11 @@ class Simulation {
     int bad = 0;
     int dropped = 0;
 
-    double respSum = 0.0;
+    // double respSum = 0.0;
     ofstream log_file;
 
     private:
-        void printLog(Time reqTime);
+        // void printLog(Time reqTime);
 
         Time thinkTime();
         Time sampleClientTimeout();
@@ -171,7 +171,7 @@ class Simulation {
 
     public:
         Time now = 0.0;
-        Simulation(Config c, int seed);
+        Simulation(Config c, int seed, string dirname);
         ~Simulation() {
             log_file.close();
         }
@@ -183,6 +183,16 @@ class Simulation {
         SimMetrics results();
 
         void schedule(Time t, EventTypes type, int sId, int reqId, int coreId = -1);
+
+        void appendLog(Time resp)
+        {
+            log_file << simTime() << ","
+                     << good << ","
+                     << bad << ","
+                     << dropped << ","
+                     << completed << ","
+                     << resp << "\n";
+        }
 };
 
 

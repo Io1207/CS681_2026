@@ -9,8 +9,11 @@
 #include <algorithm>
 #include <assert.h>
 #include <string>
+#include <map>
+#include <filesystem>
 
 using namespace std;
+namespace fs = std::filesystem;
 
 using Time = double;
 

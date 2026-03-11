@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 import os
 import io
 
+exp_dir = ""
+num_runs = 10
+
 def get_server_config(num_servers, f : io.TextIOWrapper):
     # now will ask for server details one by one
     for i in range(num_servers):
@@ -34,7 +37,7 @@ def make_config():
     print("Will now ask for info to make the configuration file for the simulation")
     print("The number of runs is 10 by default; if you want to change this, go change it in sim.h and run.py right now. Go!!")
 
-    with open("config.txt", "w") as f:
+    with open(f"{exp_dir}/config.txt", "w") as f:
         f.write(str(input("Number of delays: ")).strip() + "\n")
         f.write(str(input("Enter number of users: ")).strip() + "\n")
         f.write(str(input("Ease in time: ")).strip() + "\n")
@@ -43,21 +46,21 @@ def make_config():
         f.write(str(input("Think time variance: ")).strip() + "\n")
         num_servers = int(input("Number of servers: ").strip())
         f.write(str(num_servers) + "\n")
-        for i in range(num_servers):
-            os.system(f"touch server_{i+1}")
+        # for i in range(num_servers):
+        #     os.system(f"touch {exp_dir}/server_{i+1}")
         print("Now will be asking for server details one by one")
         make_adjacency_matrix(num_servers+1,f)
         get_server_config(num_servers,f)
     
     f.close()
-    os.system(f"cd ../../")
+    # os.system(f"cd ../../")
 
 def run_sim(num_runs):
     os.system(f"cd src && make")
-    os.system(f"cd ..")
-    for i in range(num_runs):
-        os.system(f"touch main_{i}")
-    os.system(f"./src/sim")
+    # os.system(f"cd ..")
+    # for i in range(num_runs):
+        # os.system(f"touch main_{i}")
+    os.system(f"./src/sim ../{exp_dir}")
 
 def welch_cutoff(consolidated_file_name, r, m, win_size, tol = 0.0025):
     '''
@@ -92,9 +95,11 @@ def welch_cutoff(consolidated_file_name, r, m, win_size, tol = 0.0025):
 
 if __name__ == "__main__":
     test_name = str(input("Enter the test name: "))
-    os.system(f"mkdir -p results/{test_name}")
-    os.system(f"touch results/{test_name}/config.txt")
-    os.system(f"mkdir -p results/{test_name}/runs")
+    exp_dir = f"results/{test_name}"
+    os.system(f"mkdir -p {exp_dir}")
+    os.system(f"touch {exp_dir}/config.txt")
+    for i in range (10):
+        os.system(f"mkdir -p {exp_dir}/run_{i}")
 
-    os.system(f"cd results/{test_name}")
+    # os.system(f"cd results/{test_name}")
     make_config()

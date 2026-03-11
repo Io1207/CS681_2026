@@ -45,7 +45,7 @@ class Server
 	vector<Time> responseTimes;
 	vector<Time> serviceTimes;
 
-	Simulation &sim;
+	Simulation* sim;
 
 	int good = 0;
 	int bad = 0;
@@ -63,7 +63,7 @@ class Server
 	vector<int> coreQC;
 
 public:
-	Server(int id, ServerConfig _cfg, Simulation &_sim, unsigned seed, string dirname);
+	Server(int id, ServerConfig _cfg, Simulation *_sim, unsigned seed, string dirname);
 
 	Server(const Server &) = delete;
 	Server(Server &&) = default;

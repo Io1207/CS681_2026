@@ -95,7 +95,7 @@ Simulation::Simulation(Config c, int seed, string dirname) : cfg(c), rng(seed),
     for(int i=0;i<cfg.numServers;i++)
     {
         // Server serv;
-        servers.emplace_back(i,cfg.scfgs[i],*this,rng.randInt(0,1000000000), dirname + "/run_" + to_string(cfg.run_id));
+        servers.emplace_back(i,cfg.scfgs[i],this,rng.randInt(0,1000000000), dirname + "/run_" + to_string(cfg.run_id));
     }
 
     for(int i=0;i<cfg.users;i++) {

@@ -2,6 +2,7 @@
 
 # Assumptions
 1. ```timerInterrupt``` takes negligible amt of time
+2. Server side `timeout` is the same for all requests
 
 ## The Flow
 

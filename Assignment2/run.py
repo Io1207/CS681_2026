@@ -10,8 +10,8 @@ def get_server_config(num_servers, f : io.TextIOWrapper):
     # now will ask for server details one by one
     for i in range(num_servers):
         print(f"Enter details for server {i+1} like this: ")
-        print(f"numCores maxThreads threadBuffer maxQueue dist serviceMin")
-        print(f" serviceVar contextSwitchTime roundRobinTimeout timeoutMin timeoutVar")
+        print(f"numCores maxThreads maxQueue dist serviceMin")
+        print(f"serviceVar contextSwitchTime roundRobinTimeout timeout")
         f.write(str(input()).strip() + "\n")
         f.write(str(input()).strip() + "\n")
 
@@ -20,16 +20,16 @@ def make_adjacency_matrix(num_servers, f : io.TextIOWrapper):
     print("enter the outProbs for the each server after it's id is printed like this: ")
     print("sId1 outProbcurr->sId1 outProbcurr->sId2 ... outProbcurr->sIdn")
     adj_matrix = np.zeros((num_servers, num_servers), dtype = float)
-    for j in range(num_servers+1):
+    for j in range(num_servers):
         print("Emmission matrix for server", j)
         response = str(input()).strip()
         parts = response.split()
         n = int(len(parts)/2)
         for i in range(n):
-            adj_matrix[j][parts[i*2]] = parts[i*2 + 1]
+            adj_matrix[j][int(parts[i*2])] = parts[i*2 + 1]
 
-    for i in range(len(num_servers)):
-        for j in range(len(num_servers)):
+    for i in range(num_servers):
+        for j in range(num_servers):
             f.write(str(adj_matrix[i][j]) + " ")
         f.write("\n")
 
@@ -41,7 +41,8 @@ def make_config():
         f.write(str(input("Number of delays: ")).strip() + "\n")
         f.write(str(input("Enter number of users: ")).strip() + "\n")
         f.write(str(input("Ease in time: ")).strip() + "\n")
-        f.write(str(input("Client timeout: ")).strip() + "\n")
+        f.write(str(input("Min Client timeout: ")).strip() + "\n")
+        f.write(str(input("Client timeout Variance: ")).strip() + "\n")
         f.write(str(input("Think time min: ")).strip() + "\n")
         f.write(str(input("Think time variance: ")).strip() + "\n")
         num_servers = int(input("Number of servers: ").strip())
@@ -55,12 +56,14 @@ def make_config():
     f.close()
     # os.system(f"cd ../../")
 
-def run_sim(num_runs):
+def run_sim():
     os.system(f"cd src && make")
     # os.system(f"cd ..")
     # for i in range(num_runs):
         # os.system(f"touch main_{i}")
-    os.system(f"./src/sim ../{exp_dir}")
+    seed = np.random.randint(0, 1000000000)
+    
+    os.system(f"./src/sim ../{exp_dir}/ {seed}")
 
 def welch_cutoff(consolidated_file_name, r, m, win_size, tol = 0.0025):
     '''
@@ -103,3 +106,4 @@ if __name__ == "__main__":
 
     # os.system(f"cd results/{test_name}")
     make_config()
+    run_sim()

@@ -1,7 +1,9 @@
 #include "sim.h"
 #include "servers.h"
+#include <filesystem>
 
 struct Config;
+namespace fs = std::filesystem;
 
 /*
     g++ -std=c++20 sim.cpp -O2 -o sim
@@ -24,6 +26,7 @@ Time Simulation::sampleClientTimeout()
 
 Config::Config(string filename) {
     ifstream f(filename);
+    cout << fs::current_path().string();
     if (!f.is_open()) {
         throw runtime_error("Could not open config file");
     }
@@ -436,7 +439,7 @@ int main(int argc, char* argv[]) {
     if(argc <=2)
         seed = 0;
     else 
-        seed = stoi(argv[1]);
+        seed = stoi(argv[2]);
     
 
     Config cfg = Config(dir_name + "config.txt");

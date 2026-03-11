@@ -29,6 +29,7 @@ void Server::processEvent(const Event& e) {
 		case CTX_SWITCH_OUT: CtxSwitchOut(e); updateMetrics(e); break;
 
 		case SERVER_TIMEOUT: ServerTimeout(e); updateMetrics(e); break;
+		default: break;
 		// SERVER_TIMEOUT is handled in timeout function, no sparate case for it
 	}
 	// update metrics depends on which event calls it, right? if we want to trace the path throughout the system,

@@ -183,6 +183,8 @@ void Simulation::handleEnterClient(Event& e, Request& req)
         case DROP:
             dropped++;
             break;
+        default:
+            break;
     }
     appendLog(req.completion - req.start);
 }

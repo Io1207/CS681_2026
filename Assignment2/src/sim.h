@@ -121,7 +121,7 @@ struct Event
     int reqId;
     bool operator>(Event const& o) const { return time > o.time; }
     Event() = default;
-    Event(Time time, EventTypes type, int serverId, int reqId, int core = -1) : time(time), type(type), serverId(serverId), coreId(coreId), reqId(reqId) {
+    Event(Time time, EventTypes type, int serverId, int reqId, int core = -1) : time(time), type(type), serverId(serverId), coreId(core), reqId(reqId) {
         coreId = core;
     }
 };

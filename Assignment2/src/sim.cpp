@@ -219,6 +219,7 @@ SimMetrics Simulation::results() {
     return SimMetrics();
 }
 
+
 pair<double,double> meanCI(vector<double> &v, double confidence = 0.95) {
     int n=v.size();
     double m=accumulate(v.begin(),v.end(),0.0)/n;
@@ -227,6 +228,183 @@ pair<double,double> meanCI(vector<double> &v, double confidence = 0.95) {
     s=sqrt(s/(n-1));
     double h=confidenceIntervals[confidence]*s/sqrt(n);
     return {m,h};
+}
+
+vector<double> linEqSolver(vector<vector<double>> A, vector<double> b)
+{
+    double eps = 1e-9;
+    if(A.size() == 0)
+        return {};
+    if(A.size() != b.size())
+        throw "Invalid Equations";
+
+    int n = (int) A.size();
+    int m = (int) A[0].size();
+
+    vector<int> where (m, -1);
+    for (int col=0, row=0; col<m && row<n; ++col) {
+        int sel = row;
+        for (int i=row; i<n; ++i)
+            if (abs (A[i][col]) > abs (A[sel][col]))
+                sel = i;
+        if (abs (A[sel][col]) < eps)
+            continue;
+        for (int i=col; i<=m; ++i)
+        {
+            swap (A[sel][i], A[row][i]);
+            swap(b[sel], b[row]);
+        }
+        where[col] = row;
+
+        for (int i=0; i<n; ++i)
+            if (i != row) {
+                double c = A[i][col] / A[row][col];
+                for (int j=col; j<m; ++j)
+                    A[i][j] -= A[row][j] * c;
+                b[i] -= b[row]*c;
+            }
+        ++row;
+    }
+
+    vector<double> ans(m, 0);
+    for (int i=0; i<m; ++i)
+        if (where[i] != -1)
+            ans[i] = b[where[i]] / A[where[i]][i];
+    for (int i=0; i<n; ++i) {
+        double sum = 0;
+        for (int j=0; j<m; ++j)
+            sum += ans[j] * A[i][j];
+        if (abs (sum - A[i][m]) > eps)
+            return {};
+    }
+
+    for (int i=0; i<m; ++i)
+        if (where[i] == -1)
+            return {};
+    return ans;
+
+
+}
+
+Time meanServiceTime(const ServerConfig& cf)
+{
+    switch(cf.serviceDist)
+    {
+        case ServerConfig::CONST:
+            return cf.serviceMin;
+        case ServerConfig::UNIFORM:
+            return cf.serviceMin + cf.serviceVar/2;
+        case ServerConfig::EXP:
+            return cf.serviceMin + cf.serviceVar;
+        default:
+            return cf.serviceMin;
+    }
+}
+
+SimMetrics getTheoreticalResults(const Config& sim_config, const vector<ServerConfig>& sfgs) {
+    SimMetrics t_results = SimMetrics();
+    
+    // getting theoretical relative visits
+    vector<vector<double>> A(sim_config.numServers, vector<double>(sim_config.numServers));
+    vector<double> b(sim_config.numServers);
+
+    /**
+     * VP = V; V[0] = 1; 
+     * P =  | P00  P0 |
+     *      | P'0  At |
+     * V = | V0 V' |
+     *      
+     * Solve V' (At - I) = - V0 P0
+     * Check against V0 P00 + V' P'0 = V0
+     */
+    for(int i=0; i<sim_config.numServers;i++)
+    {
+        for(int j=0;j<sim_config.numServers;j++)
+        {
+            A[i][j] = sim_config.adjMatrix[j+1][i+1];
+            if(i == j)  A[i][j] -= 1;
+        }
+    }
+    for(int i=0;i<sim_config.numServers;i++)
+    {
+        b[i] = - sim_config.adjMatrix[0][i+1];
+    }
+    vector<double> V = linEqSolver(A, b);
+    
+    if(V.empty())   
+        throw "Empty Solution";
+    else
+    {
+        double sum = 0;
+        sum += sim_config.adjMatrix[0][0];
+        for(int i=0;i<sim_config.numServers;i++)
+        {
+            sum += b[i] * sim_config.adjMatrix[i+1][0];
+        } 
+        if(abs(sum - 1.0) > 1e-9)
+            throw "Bad Solution";
+    }
+
+
+    vector<double> visits(sim_config.numServers + 1);
+    visits[0] = 1;
+    copy(V.begin(), V.end(), visits.begin()+1);
+
+    vector<double> serviceTime(sim_config.numServers + 1, 0.0);
+    vector<double> serverDemand(sim_config.numServers + 1, 0.0);
+    for(int i=1; i<=sim_config.numServers;i++)
+    {
+        serviceTime[i] = meanServiceTime(sfgs[i-1]);
+        serverDemand[i] = serviceTime[i] * visits[i];
+    }
+
+    // num-in-system, response time, throughput
+    // idx[0] --> system
+    // idx[i] --> server i
+    vector<vector<double>> N(sim_config.users+1, vector<double>(sim_config.numServers+1,0));
+    vector<vector<double>> R(sim_config.users+1, vector<double>(sim_config.numServers+1,0));
+    vector<vector<double>> T(sim_config.users+1, vector<double>(sim_config.numServers+1,0));
+    for(int M = 1;M <= sim_config.users; M++)
+    {
+        for(int serv = 1;serv <= sim_config.numServers;serv++)
+        {
+            R[M][serv] = (1 + N[M-1][serv]) * serviceTime[serv];
+            R[M][0] += R[M][serv] * visits[serv];
+        }
+        // N[M][0] = M;
+        T[M][0] = M / R[M][0];
+        for(int serv = 1; serv <= sim_config.numServers;serv++)
+        {
+            T[M][serv] = T[M][0] * visits[serv];
+            N[M][serv] = T[M][serv] * R[M][serv];
+        }
+        
+    }
+
+    int totM = sim_config.users;
+    t_results.serverDemands.resize(sim_config.numServers);
+    t_results.serverResponseTimes.resize(sim_config.numServers);
+    t_results.throughputs.resize(sim_config.numServers);
+    t_results.nodeVisitCounts.resize(sim_config.numServers);
+    move(serverDemand.begin()+1, serverDemand.end(), t_results.serverDemands.begin());
+    move(R[totM].begin()+1,R[totM].end(),t_results.serverResponseTimes.begin());
+    move(T[totM].begin()+1,T[totM].end(),t_results.throughputs.begin());
+    move(N[totM].begin()+1,N[totM].end(),t_results.nodeVisitCounts.begin());
+
+    // Why is util not a vector?
+    t_results.throughput = T[totM][0];
+    
+    // How to get theoretical goodput, badput, dropRate?
+    // I don't think we can theoretically model a limited buffer and drops
+
+    t_results.sysResponseTime = R[totM][0];
+
+    return t_results;
+
+    // vector<double> curr_out(sim_config.numServers + 1);
+    // for (int i = 0; i <= sim_config.numServers; i++) {
+        
+    // }
 }
 
 // SimMetrics getTheoreticalResults(Config sim_config, vector<ServerConfig> sfgs) {

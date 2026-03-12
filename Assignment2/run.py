@@ -63,7 +63,7 @@ def run_sim():
         # os.system(f"touch main_{i}")
     seed = np.random.randint(0, 1000000000)
     
-    os.system(f"./src/sim ../{exp_dir}/ {seed}")
+    os.system(f"./src/sim ./{exp_dir}/ {seed}")
 
 def welch_cutoff(consolidated_file_name, r, m, win_size, tol = 0.0025):
     '''
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     exp_dir = f"results/{test_name}"
     os.system(f"mkdir -p {exp_dir}")
     os.system(f"touch {exp_dir}/config.txt")
-    for i in range (10):
+    for i in range (1,11):
         os.system(f"mkdir -p {exp_dir}/run_{i}")
 
     # os.system(f"cd results/{test_name}")

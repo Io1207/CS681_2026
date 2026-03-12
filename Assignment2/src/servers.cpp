@@ -14,10 +14,11 @@ Server::Server(int id, ServerConfig _cfg, Simulation* _sim, unsigned seed, strin
 	rng(seed) {
 	
 	log_file.open(dirname + "/server_" + to_string(id) + ".log");
-	threadInfo.resize(cfg.threadBuffer);
+	// threadInfo.resize(cfg.threadBuffer);
 }
 
 void Server::processEvent(const Event& e) {
+	// cout << e.reqId << "\n";
 	Request& req = sim->getRequest(e.reqId);
 	int calling_event = -1;
 	switch(e.type)
@@ -62,9 +63,7 @@ void Server::EnterServer(Request& req) {
 		{
 			// maybe initialise ideal core to 0? when would we even enter this condition
 			if(idealCore >= 0 && coreQueue[i].size() < coreQueue[idealCore].size())
-			{
 				idealCore = i;
-			}
 			else if(idealCore == -1)
 				idealCore = i;
 		}
@@ -104,8 +103,8 @@ void Server::EnterServer(Request& req) {
 			sim->schedule(sim->simTime(), 
 						ENTER_CLIENT, 
 						0, 
-						req.user, 
-						-1);
+						req.id, 
+						req.user);
 			
 		}
 	}
@@ -254,7 +253,7 @@ void Server::FinishService(const Event& e)
 	else {good++; req.setReturnStatus(GOOD);}
 	responseTimes.push_back(resp);
 	serviceTimes.push_back(serv);
-
+	req.activeServer = routeNext();
 	coreQueue[core].pop();
 	if(req.activeServer == 0)
 	{
@@ -265,8 +264,8 @@ void Server::FinishService(const Event& e)
 			sim->schedule(sim->simTime(), 
 						ENTER_CLIENT, 
 						0, 
-						req.user, 
-						-1);
+						req.id, 
+						req.user);
 	}
 	else 
 	{
@@ -311,8 +310,8 @@ void Server::ServerTimeout(const Event& e)
 	sim->schedule(sim->simTime(), 
 					ENTER_CLIENT, 
 					0, 
-					req.user, 
-					-1);
+					req.id, 
+					req.user);
 
 	coreQueue[core].pop();
 	assignThread(core);

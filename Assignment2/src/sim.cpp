@@ -26,7 +26,8 @@ Time Simulation::sampleClientTimeout()
 
 Config::Config(string filename) {
     ifstream f(filename);
-    cout << fs::current_path().string();
+    cout << fs::current_path().string() << endl;
+    cout << filename << endl;
     if (!f.is_open()) {
         throw runtime_error("Could not open config file");
     }
@@ -36,18 +37,18 @@ Config::Config(string filename) {
     f >> numServers;
 
     adjMatrix.resize(numServers+1);
-    for(int i=0;i<numServers;i++) {
-        adjMatrix[i].resize(numServers);
-        for(int j=0;j<numServers;j++) {
+    for(int i=0;i<=numServers;i++) {
+        adjMatrix[i].resize(numServers+1);
+        for(int j=0;j<=numServers;j++) {
             f >> adjMatrix[i][j];
         }
     }
 
     scfgs.resize(numServers);
-    for(int i=1; i<=numServers; i++) {
+    for(int i=0; i<numServers; i++) {
         ServerConfig &s = scfgs[i];
 
-        f >> s.numCores >> s.maxThreads >> s.threadBuffer >> s.maxQueue;
+        f >> s.numCores >> s.maxThreads >> s.maxQueue;
         
         int dist;
         f >> dist >> s.serviceMin >> s.serviceVar;
@@ -58,16 +59,17 @@ Config::Config(string filename) {
         f >> s.contextSwitchTime >> s.roundRobinTimeout;
         f >> s.timeout;
 
-        s.outProbs = adjMatrix[i];
+        s.outProbs = adjMatrix[i+1];
     }
 }
 
-ClientNode::ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> outProbs):
-                 users(users), thinkMin(thinkMin), thinkVar(thinkVar), rng(seed) {
+ClientNode::ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> _outProbs):
+                 users(users), thinkMin(thinkMin), thinkVar(thinkVar), rng(seed) 
+{
     double cumProbs = 0;
-    for (int i = 0; i < outProbs.size(); i++) {
-        if (outProbs[i] > 0) {
-            cumProbs += outProbs[i];
+    for (int i = 0; i < _outProbs.size(); i++) {
+        if (_outProbs[i] > 0) {
+            cumProbs += _outProbs[i];
             this->outProbs.push_back({i, cumProbs});
         }
     }
@@ -93,33 +95,36 @@ Simulation::Simulation(Config c, int seed, string dirname) : cfg(c), rng(seed),
     metrics.serverResponseTimes.resize(cfg.numServers);
 
     log_file.open(dirname + "/run_" + to_string(cfg.run_id) + "/main.log");
+    event_log.open(dirname + "/run_" + to_string(cfg.run_id) + "/events.log");
     now = 0.0;
     Time lastScheduled = 0.0;
+    // servers.emplace_back(0,cfg.scfgs[0],this,0,)
+    // servers.emplace_back();
     for(int i=0;i<cfg.numServers;i++)
     {
         // Server serv;
-        servers.emplace_back(i,cfg.scfgs[i],this,rng.randInt(0,1000000000), dirname + "/run_" + to_string(cfg.run_id));
+        servers.emplace_back(i+1,cfg.scfgs[i],this,rng.randInt(0,1000000000), dirname + "/run_" + to_string(cfg.run_id));
     }
 
     for(int i=0;i<cfg.users;i++) {
         lastScheduled += rng.exponential(double(cfg.users)/cfg.ease_in);
-        requests.emplace_back(i+1, i, cfg.numServers, sampleClientTimeout());
-        schedule(lastScheduled, LEAVE_CLIENT, client.route(), i);
+        // requests.emplace_back(i, cfg.numServers, sampleClientTimeout());
+        schedule(lastScheduled, LEAVE_CLIENT, client.route(), i, i);
     }
 }
 
 void Simulation::schedule(Time t, EventTypes type, int sId, int reqId, int coreId) {
-    fel.push({t, type, sId, coreId, reqId});
+    fel.push(Event(t, type, sId, reqId, coreId));
 }
 
 void Simulation::scheduleThink(int user, Time base) {
-    requests.emplace_back(Request::ctr, user, cfg.numServers, sampleClientTimeout());
-    schedule(base+thinkTime(), LEAVE_CLIENT, client.route(), user);
+    // requests.emplace_back(user, cfg.numServers, sampleClientTimeout());
+    schedule(base+thinkTime(), LEAVE_CLIENT, client.route(), -1, user);
     // printLog(); // ?
 }
 
 Request& Simulation::getRequest(int reqId) {
-    return requests[reqId-1];
+    return requests[reqId];
 }
 
 Time Simulation::simTime() {
@@ -140,28 +145,26 @@ void Simulation::run() {
         e = fel.top();
         fel.pop();
         now = e.time;
-        int lastReqId = requests.size();
+        event_log << e;
         switch (e.type) {
             case LEAVE_CLIENT: 
-                servers[e.serverId].processEvent(Event(e.time, ENTER_SERVER, e.serverId, lastReqId+1));
-                schedule(e.time, ENTER_SERVER, e.serverId, lastReqId+1);
-                client.visitCount++;
-                requests.emplace_back(lastReqId+1, e.serverId, cfg.numServers, sampleClientTimeout()); 
+                // servers[e.serverId-1].processEvent(Event(e.time, ENTER_SERVER, e.serverId, lastReqId+1));
+                requests.emplace_back(e.coreId , cfg.numServers, sampleClientTimeout()); 
+                schedule(e.time, ENTER_SERVER, e.serverId, requests.back().id);
                 requests.back().start = simTime();
                 break;
             case ENTER_CLIENT: 
                 handleEnterClient(e, getRequest(e.reqId));
-
                 break;
-            case ENTER_SERVER: 
-                servers[e.serverId].processEvent(e); 
-                break;
+            // case ENTER_SERVER: 
+            //     servers[e.serverId-1].processEvent(e); 
+            //     break;
             case CLIENT_TIMEOUT: 
                 clientTimeout(getRequest(e.reqId)); 
                 scheduleThink(e.reqId, e.time); 
                 break;
             default: 
-                servers[e.serverId].processEvent(e); 
+                servers[e.serverId-1].processEvent(e); 
                 break;
             // case SERVER_TIMEOUT: servers[e.serverId].processEvent(e); break;
         }
@@ -170,6 +173,7 @@ void Simulation::run() {
 
 void Simulation::handleEnterClient(Event& e, Request& req)
 {
+    client.visitCount++;
     req.completion = simTime();
     scheduleThink(req.user, e.time); 
     switch(req.ret)
@@ -204,22 +208,22 @@ void Simulation::clientTimeout(Request& req) {
 
 SimMetrics Simulation::results() {
     // double effTime = simTime() - cfg.warmup;
-    SimMetrics m{};
-    int totalCompleted = 0;
-    for (int i = 0; i<cfg.numServers; i++) {
-        totalCompleted += servers[i].getCompleted();
-        m.nodeVisitCounts[i] = servers[i].getVisits();
-        m.serverDemands[i] = servers[i].getAvgServiceTime();
-        m.serverDemands[i] = servers[i].getAvgResponseTime();
-    }
-    int totalVisits = accumulate(m.nodeVisitCounts.begin(), m.nodeVisitCounts.end(), 0);
+    // SimMetrics m{};
+    // int totalCompleted = 0;
+    // for (int i = 0; i<cfg.numServers; i++) {
+    //     totalCompleted += servers[i].getCompleted();
+    //     m.nodeVisitCounts[i] = servers[i].getVisits();
+    //     m.serverDemands[i] = servers[i].getAvgServiceTime();
+    //     m.serverDemands[i] = servers[i].getAvgResponseTime();
+    // }
+    // int totalVisits = accumulate(m.nodeVisitCounts.begin()+1, m.nodeVisitCounts.end(), 0);
     
-    transform(m.nodeVisitCounts.begin(), m.nodeVisitCounts.end(), m.nodeVisitCounts.begin(), [totalVisits] (int x) {return x/totalVisits;});
+    // transform(m.nodeVisitCounts.begin()+1, m.nodeVisitCounts.end(), m.nodeVisitCounts.begin(), [totalVisits] (int x) {return x/totalVisits;});
 
-    for (int i = 0; i<cfg.numServers; i++) {
-        m.serverResponseTimes[i] = m.serverResponseTimes[i] / m.nodeVisitCounts[i];
+    // for (int i = 0; i<cfg.numServers; i++) {
+    //     m.serverResponseTimes[i] = m.serverResponseTimes[i] / m.nodeVisitCounts[i];
 
-    }
+    // }
 
     return SimMetrics();
 }
@@ -442,7 +446,7 @@ int main(int argc, char* argv[]) {
         seed = stoi(argv[2]);
     
 
-    Config cfg = Config(dir_name + "config.txt");
+    Config cfg = Config(dir_name + "/config.txt");
     vector<double> resp;
     vector<double> thr;
     vector<double> good;

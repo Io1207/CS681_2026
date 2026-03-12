@@ -36,7 +36,7 @@ struct RNG {
         lognormal_distribution<> d(m,s);
         return d(gen);
     }
-    unsigned int randInt(int max, int min) {
+    unsigned int randInt(int min, int max) {
         uniform_int_distribution<> d(min, max);
         return d(gen);
     } 

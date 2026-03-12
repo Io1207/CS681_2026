@@ -47,8 +47,7 @@ struct Request
     int activeServer;
     Time remService;
 
-    Request(int id, int user, int serverCount, Time ttl) : user(user), c_timeout(ttl) {
-        ctr++;
+    Request(int user, int serverCount, Time ttl) : id(ctr++), user(user), c_timeout(ttl) {
         serviceStartTimes.resize(serverCount+1, -1);
         serviceResponseTimes.resize(serverCount+1, 0);
         // coreStartTimes.resize(serverCount+1, -1);
@@ -82,7 +81,7 @@ struct Config {
     bool sys_other = false;
 
     int runs = 10;
-    Config() = default;
+    // Config();
     Config(string filename);
 };
 
@@ -112,6 +111,7 @@ enum EventTypes {
     SERVER_TIMEOUT,
 };
 
+
 struct Event
 {
     Time time;
@@ -121,10 +121,39 @@ struct Event
     int reqId;
     bool operator>(Event const& o) const { return time > o.time; }
     Event() = default;
-    Event(Time time, EventTypes type, int serverId, int reqId, int core = -1) : time(time), type(type), serverId(serverId), coreId(core), reqId(reqId) {
-        coreId = core;
-    }
+    Event(Time time, EventTypes type, int serverId, int reqId, int core = -1) : 
+        time(time), type(type), serverId(serverId), coreId(core), reqId(reqId) 
+    {}
 };
+
+inline ostream& operator<< (ostream& o, const Event& e)
+{
+    string type;
+    switch(e.type)
+    {
+        case LEAVE_CLIENT:
+            type = "LEAVE_CLIENT"; break;
+        case ENTER_CLIENT:
+            type = "ENTER_CLIENT"; break;
+        case ENTER_SERVER:
+            type = "ENTER_SERVER"; break;
+        case CTX_SWITCH_IN:
+            type = "CTX_SWITCH_IN"; break;
+        case CTX_SWITCH_OUT:
+            type = "CTX_SWITCH_OUT"; break;
+        case FINISH_SERVICE:
+            type = "FINISH_SERVICE"; break;
+        case CLIENT_TIMEOUT:
+            type = "CLIENT_TIMEOUT"; break;
+        case SERVER_TIMEOUT:
+            type ="CLIENT_TIMEOUT"; break;
+    }
+
+    o << e.time << "," << type << "," << e.serverId << "," << e.coreId
+        << "," << e.reqId << "\n";
+
+    return o;
+}
 
 struct SimMetrics {
     vector<int> nodeVisitCounts;
@@ -159,6 +188,7 @@ class Simulation {
 
     // double respSum = 0.0;
     ofstream log_file;
+	ofstream event_log;
 
     private:
         // void printLog(Time reqTime);
@@ -174,6 +204,8 @@ class Simulation {
         Simulation(Config c, int seed, string dirname);
         ~Simulation() {
             log_file.close();
+            event_log.close();
+            Request::ctr = 0;
         }
 
         void run();

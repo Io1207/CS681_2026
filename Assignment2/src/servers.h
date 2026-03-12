@@ -9,7 +9,7 @@ struct ServerConfig
 	unsigned int numCores;
 	unsigned int maxThreads;
 	unsigned int maxQueue;
-	unsigned int threadBuffer;
+	// unsigned int threadBuffer;
 	enum Dist
 	{
 		CONST,
@@ -59,11 +59,14 @@ class Server
 	Time sumTotalInServer;
 
 	ofstream log_file;
+
 	vector<Thread> threadInfo;
 	vector<int> coreQC;
 
 public:
 	Server(int id, ServerConfig _cfg, Simulation *_sim, unsigned seed, string dirname);
+	Server() : rng(0) 
+	{}
 
 	Server(const Server &) = delete;
 	Server(Server &&) = default;

@@ -173,6 +173,9 @@ void Simulation::run() {
 
 void Simulation::handleEnterClient(Event& e, Request& req)
 {
+    if(req.ended)
+        throw "Request Re-entering server";
+    req.ended = true;
     client.visitCount++;
     req.completion = simTime();
     scheduleThink(req.user, e.time); 
@@ -193,6 +196,8 @@ void Simulation::handleEnterClient(Event& e, Request& req)
         default:
             break;
     }
+    if(req.ret != S_TIMEOUT && req.ret != C_TIMEOUT)
+        completed++;
     appendLog(req.completion - req.start);
 }
 
@@ -201,9 +206,10 @@ void Simulation::clientTimeout(Request& req) {
     // next think time for this user.
     req.timedOut = true;
     req.setReturnStatus(C_TIMEOUT);
+    scheduleThink(req.user, simTime());
     // bad++;
     // scheduleThink(req.user, simTime()+client.timeoutOverhead);
-    schedule(simTime(), ENTER_CLIENT, -1, req.id);
+    // schedule(simTime(), ENTER_CLIENT, -1, req.id);
 }
 
 SimMetrics Simulation::results() {

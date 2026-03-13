@@ -44,9 +44,10 @@ we run ```run.py``` and supply to it an easier form of the config file which is 
 {test_name}
  |
  |-config.txt
- |-run_{i}
- |  |-main.log
- |  |-server_{i}.log
+ |-{i}_users
+ |  |-run_{i}
+ |     |-main.log
+ |     |-server_{i}.log
  |
  |-response_times.log
  |-stats.log
@@ -54,3 +55,15 @@ we run ```run.py``` and supply to it an easier form of the config file which is 
 
 - __Main Log__: `time, #good, #bad, #dropped, #completed, response-time`
 - __Server Log__: `time, #good, #bad, #dropped, response-time, service-time, active-time, # in server indicator`
+
+## Python Scripts
+
+You only need to `run.py` with different arguments to run the simulation
+
+ - `run.py sim` : Create config for a simulation (fixed # of users, 10 runs) and run the simulation
+
+- `run.py rerun_sim <dir>` : Rerun the simulation in `<dir>` directory. Supplied directory must contain a simulation `config.txt` file. Note: overwrites old data. use carefully
+
+ - `run.py expt` : Create config for an experiment (Users vary in a range, 10 runs for each load level) and runs multiple simulation. Also, generates plots for metrics vs #users. 
+ 
+ - `run.py rerun_expt <dir>` : Similar to `rerun_sim`, but for experiments

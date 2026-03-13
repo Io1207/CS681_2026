@@ -4,6 +4,7 @@ import os
 import io
 import math
 import sys
+from stats import *
 
 exp_dir = ""
 num_runs = 10
@@ -109,14 +110,17 @@ def sim_cfg_from_expt(dirname):
         os.system(f"mkdir -p {dirname}/{u}_users")
         gen_sim_cfg(lines, u, f"{dirname}/{u}_users/config.txt")
         dirs.append(f"{dirname}/{u}_users")
-    return dirs
+    return dirs, range(start, stop, step)
 
 
 def run_exp(exp_dir):
     print(exp_dir)
-    sims = sim_cfg_from_expt(exp_dir)
+    sims, users = sim_cfg_from_expt(exp_dir)
     for s in sims:
         run_sim(s)
+
+    stats = get_exp_stats(exp_dir, users, num_runs)
+    plot_stats(exp_dir, users, stats)
 
 
 

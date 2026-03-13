@@ -40,6 +40,8 @@ struct Request
     return_status ret = NOT_SET;
     Time serviceTime;
 
+    bool ended = false;
+
     vector<Time> serviceStartTimes;
     // vector<Time> coreStartTimes;
     vector<Time> serviceTimes;

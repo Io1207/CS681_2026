@@ -26,8 +26,8 @@ Time Simulation::sampleClientTimeout()
 
 Config::Config(string filename) {
     ifstream f(filename);
-    cout << fs::current_path().string() << endl;
-    cout << filename << endl;
+    // cout << fs::current_path().string() << endl;
+    // cout << filename << endl;
     if (!f.is_open()) {
         throw runtime_error("Could not open config file");
     }
@@ -469,13 +469,13 @@ int main(int argc, char* argv[]) {
         // util.push_back(m.util);
     }
 
-    auto [meanR,ciR] = meanCI(resp);
-    cout<<"Avg Response Time: "<<meanR<<" +/- "<<ciR<<"\n";
-    cout<<"Throughput: "<<accumulate(thr.begin(),thr.end(),0.0)/thr.size()<<"\n";
-    cout<<"Goodput: "<<accumulate(good.begin(),good.end(),0.0)/good.size()<<"\n";
-    cout<<"Badput: "<<accumulate(bad.begin(),bad.end(),0.0)/bad.size()<<"\n";
-    cout<<"Drop Rate: "<<accumulate(drop.begin(),drop.end(),0.0)/drop.size()<<"\n";
-    cout<<"Utilization: "<<accumulate(util.begin(),util.end(),0.0)/util.size()<<"\n";
+    // auto [meanR,ciR] = meanCI(resp);
+    // cout<<"Avg Response Time: "<<meanR<<" +/- "<<ciR<<"\n";
+    // cout<<"Throughput: "<<accumulate(thr.begin(),thr.end(),0.0)/thr.size()<<"\n";
+    // cout<<"Goodput: "<<accumulate(good.begin(),good.end(),0.0)/good.size()<<"\n";
+    // cout<<"Badput: "<<accumulate(bad.begin(),bad.end(),0.0)/bad.size()<<"\n";
+    // cout<<"Drop Rate: "<<accumulate(drop.begin(),drop.end(),0.0)/drop.size()<<"\n";
+    // cout<<"Utilization: "<<accumulate(util.begin(),util.end(),0.0)/util.size()<<"\n";
 }
 
 // void Simulation::printLog(Time time) {

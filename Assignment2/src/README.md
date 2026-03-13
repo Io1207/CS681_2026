@@ -51,3 +51,6 @@ we run ```run.py``` and supply to it an easier form of the config file which is 
  |-response_times.log
  |-stats.log
 ```
+
+- __Main Log__: `time, #good, #bad, #dropped, #completed, response-time`
+- __Server Log__: `time, #good, #bad, #dropped, response-time, service-time, active-time, # in server indicator`

@@ -332,41 +332,24 @@ void Server::timeout(const Event& e) {
 			req.serviceStartTimes[serverId] + req.c_timeout,
 			CLIENT_TIMEOUT,
 			serverId,
-			req.id);
+			req.id,
+			e.coreId);
 	}
 
 	else if (sim->simTime() - req.serviceStartTimes[serverId] > cfg.timeout){
 		req.timedOut = true;
-		req.serviceTimes[serverId-1] += sim->simTime() - req.serviceStartTimes[serverId];
+		req.serviceTimes[serverId] += sim->simTime() - req.serviceStartTimes[serverId];
 		req.setReturnStatus(S_TIMEOUT);
 		updateMetrics(e);
 		sim->schedule(sim->simTime(),
 				 SERVER_TIMEOUT,
 				 req.activeServer,
+				 req.id,
 				 e.coreId);
 		// processEvent(Event(sim->simTime(), FINISH_SERVICE, serverId, req.id, e.coreId));
 	}
 	return;
 }
-
-// void Server::updateMetrics(int calling_event = 0)
-// {
-// 	totalActiveTime += numCoresActive * (sim->simTime() - lastEvent);
-// 	sumTotalInServer += totalInServer * (sim->simTime() - lastEvent);
-
-// 	numCoresActive = 0;
-// 	totalInServer = 0;
-// 	for(int i=0;i<cfg.numCores;i++)
-// 	{
-// 		if(coreQueue[i].size() > 0)
-// 			numCoresActive++;
-// 		totalInServer += coreQueue[i].size();
-// 	}
-// 	totalInServer += threadQueue.size();
-
-// 	log_file <<  getAvgServiceTime() << "," << getAvgResponseTime() << "," << getGood() << "," << getBad() << "," << getVisits() << "," << endl;
-// 	return;
-// }
 
 void Server::updateMetrics(const Event& e)
 {

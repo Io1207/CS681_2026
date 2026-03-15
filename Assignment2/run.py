@@ -92,6 +92,7 @@ def run_sim(sim_dir):
     seed = np.random.randint(0, 1000000000)
     
     os.system(f"./src/sim ./{sim_dir}/ {seed}")
+    
 
 def gen_sim_cfg(lines, users, file):
     lines[1] = f"{users}\n"

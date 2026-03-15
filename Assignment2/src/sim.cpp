@@ -161,7 +161,7 @@ void Simulation::run() {
             //     break;
             case CLIENT_TIMEOUT: 
                 clientTimeout(getRequest(e.reqId)); 
-                scheduleThink(e.reqId, e.time); 
+                // scheduleThink(e.reqId, e.time); 
                 break;
             default: 
                 servers[e.serverId-1].processEvent(e); 
@@ -198,7 +198,8 @@ void Simulation::handleEnterClient(Event& e, Request& req)
     }
     if(req.ret != S_TIMEOUT && req.ret != C_TIMEOUT)
         completed++;
-    appendLog(req.completion - req.start);
+    if (req.ret == GOOD)
+        appendLog(req.completion - req.start);
 }
 
 void Simulation::clientTimeout(Request& req) {

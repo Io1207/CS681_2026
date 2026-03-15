@@ -333,7 +333,7 @@ void Server::timeout(const Event& e) {
 			CLIENT_TIMEOUT,
 			serverId,
 			req.id,
-			e.coreId);
+			req.user);
 	}
 
 	else if (sim->simTime() - req.serviceStartTimes[serverId] > cfg.timeout){

@@ -138,7 +138,12 @@ Time Simulation::thinkTime() {
 void Simulation::run() {
     Event e;
     while (!fel.empty()) {
-        if (client.visitCount >= cfg.numDelays) {
+        if (client.seenDelays >= cfg.numDelays) {
+            fel = {};
+            break;
+        }
+        if(client.doomCount >= ClientNode::doomThresh)
+        {
             fel = {};
             break;
         }
@@ -150,6 +155,12 @@ void Simulation::run() {
             case LEAVE_CLIENT: 
                 // servers[e.serverId-1].processEvent(Event(e.time, ENTER_SERVER, e.serverId, lastReqId+1));
                 requests.emplace_back(e.coreId , cfg.numServers, sampleClientTimeout()); 
+                schedule(
+                    simTime() + requests.back().c_timeout,
+                    CLIENT_TIMEOUT,
+                    0,
+                    requests.back().id,
+                    requests.back().user);
                 schedule(e.time, ENTER_SERVER, e.serverId, requests.back().id);
                 requests.back().start = simTime();
                 break;
@@ -196,15 +207,22 @@ void Simulation::handleEnterClient(Event& e, Request& req)
         default:
             break;
     }
-    if(req.ret != S_TIMEOUT && req.ret != C_TIMEOUT)
+    if(req.ret == S_TIMEOUT)
+        client.doomCount++;
+    if(req.ret != S_TIMEOUT && req.ret != DROP)
         completed++;
     if (req.ret == GOOD)
+    {
+        client.seenDelays++;
         appendLog(req.completion - req.start);
+    }
 }
 
 void Simulation::clientTimeout(Request& req) {
     // This is called when a request times out at the client node. We need to schedule the 
     // next think time for this user.
+    if(req.completed || req.ended)
+        return;
     req.timedOut = true;
     req.setReturnStatus(C_TIMEOUT);
     scheduleThink(req.user, simTime());

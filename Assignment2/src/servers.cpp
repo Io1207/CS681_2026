@@ -321,22 +321,22 @@ void Server::ServerTimeout(const Event& e)
 void Server::timeout(const Event& e) {
 	Request& req = sim->getRequest(e.reqId);
 
-	if ((req.remService>cfg.roundRobinTimeout ? cfg.roundRobinTimeout : req.remService)
-	 + sim->simTime() - req.serviceStartTimes[serverId] > req.c_timeout
-	&& req.ret != C_TIMEOUT) {
-		req.timedOut = true;
-		req.setReturnStatus(C_TIMEOUT);
-		// bad++;
-		updateMetrics(e);
-		sim->schedule(
-			req.serviceStartTimes[serverId] + req.c_timeout,
-			CLIENT_TIMEOUT,
-			serverId,
-			req.id,
-			req.user);
-	}
+	// if ((req.remService>cfg.roundRobinTimeout ? cfg.roundRobinTimeout : req.remService)
+	//  + sim->simTime() - req.serviceStartTimes[serverId] > req.c_timeout
+	// && req.ret != C_TIMEOUT) {
+	// 	req.timedOut = true;
+	// 	req.setReturnStatus(C_TIMEOUT);
+	// 	// bad++;
+	// 	updateMetrics(e);
+	// 	sim->schedule(
+	// 		req.serviceStartTimes[serverId] + req.c_timeout,
+	// 		CLIENT_TIMEOUT,
+	// 		serverId,
+	// 		req.id,
+	// 		req.user);
+	// }
 
-	else if (sim->simTime() - req.serviceStartTimes[serverId] > cfg.timeout){
+	if (sim->simTime() - req.serviceStartTimes[serverId] > cfg.timeout){
 		req.timedOut = true;
 		req.serviceTimes[serverId] += sim->simTime() - req.serviceStartTimes[serverId];
 		req.setReturnStatus(S_TIMEOUT);

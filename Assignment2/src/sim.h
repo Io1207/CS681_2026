@@ -96,10 +96,14 @@ class ClientNode {
 public:
     Time timeoutOverhead = 0.001;
     int visitCount = 0;
+    int seenDelays = 0;
+    int doomCount = 0;   // For early stopping unstable runs
     ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> outProbs);
     Time thinkTime();
     int route();
+    inline static const int doomThresh = 10000000;
 };
+
 
 
 enum EventTypes {   
@@ -148,7 +152,7 @@ inline ostream& operator<< (ostream& o, const Event& e)
         case CLIENT_TIMEOUT:
             type = "CLIENT_TIMEOUT"; break;
         case SERVER_TIMEOUT:
-            type ="CLIENT_TIMEOUT"; break;
+            type ="SERVER_TIMEOUT"; break;
     }
 
     o << e.time << "," << type << "," << e.serverId << "," << e.coreId

@@ -1,0 +1,3 @@
+with a short client timeout, server works as it is, 
+oblivious of the fact that client is timing out,
+seen by constant throughput, but increasing badput

@@ -138,15 +138,15 @@ Time Simulation::thinkTime() {
 void Simulation::run() {
     Event e;
     while (!fel.empty()) {
-        if (client.seenDelays >= cfg.numDelays) {
+        if (client.visitCount >= cfg.numDelays) {
             fel = {};
             break;
         }
-        if(client.doomCount >= ClientNode::doomThresh)
-        {
-            fel = {};
-            break;
-        }
+        // if(client.doomCount >= ClientNode::doomThresh)
+        // {
+        //     fel = {};
+        //     break;
+        // }
         e = fel.top();
         fel.pop();
         now = e.time;
@@ -189,19 +189,20 @@ void Simulation::handleEnterClient(Event& e, Request& req)
     req.ended = true;
     client.visitCount++;
     req.completion = simTime();
+
     scheduleThink(req.user, e.time); 
     switch(req.ret)
     {
-        case C_TIMEOUT:
+        case (int)C_TIMEOUT:
             bad++;
             break;
-        case GOOD:
+        case (int)GOOD:
             good++;
             break;
-        case S_TIMEOUT:
+        case (int)S_TIMEOUT:
             dropped++;
             break;
-        case DROP:
+        case (int)DROP:
             dropped++;
             break;
         default:
@@ -226,7 +227,8 @@ void Simulation::clientTimeout(Request& req) {
     req.timedOut = true;
     req.setReturnStatus(C_TIMEOUT);
     scheduleThink(req.user, simTime());
-    // bad++;
+    bad++;
+    completed++;
     // scheduleThink(req.user, simTime()+client.timeoutOverhead);
     // schedule(simTime(), ENTER_CLIENT, -1, req.id);
 }

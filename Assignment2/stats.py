@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from run import welch_cutoff
 from run_welch import consolidate
+import math
 
 
 main_cols = ['time','good','bad','dropped','completed','resp']
@@ -36,8 +37,16 @@ def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 	metr = [0,0,0,0,0]
 	for i in range(5):
 		metr[i] = np.mean(runs[:,i])
+
+	#90% confidence intervals
+	resps = runs[:,0]
+	mean = np.mean(resps)
+	std = np.std(resps) 
+	ci = 1.645 * std / math.sqrt(10)
+
 	return {
 		"resp" : metr[0],
+		"ci"   : ci,
 		"gput" : metr[1],
 		"bput" : metr[2],
 		"tput" : metr[3],
@@ -46,6 +55,7 @@ def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 
 def get_exp_stats(dirname, users, num_runs, window = 40, cutoff = None):
 	resps = []
+	cis   = []
 	gputs = []
 	bputs = []
 	tputs = []
@@ -54,6 +64,7 @@ def get_exp_stats(dirname, users, num_runs, window = 40, cutoff = None):
 	for u in users:
 		stats = get_sim_stats(f"{dirname}/{u}_users/", num_runs, window, cutoff)
 		resps.append(stats["resp"])
+		cis.append(stats["ci"])
 		gputs.append(stats["gput"])
 		bputs.append(stats["bput"])
 		tputs.append(stats["tput"])
@@ -61,7 +72,8 @@ def get_exp_stats(dirname, users, num_runs, window = 40, cutoff = None):
 
 	return {
 		"resps" : resps,
-		"gputs" : gputs,
+		"cis"   : cis,
+  		"gputs" : gputs,
 		"bputs" : bputs,
 		"tputs" : tputs,
 		"drate" : drates
@@ -100,6 +112,7 @@ def gen_multiple_resp(dirlist, lbl_list, save_file, users, num_runs, window = 40
 
 def plot_stats(dirname, users, stats):
 	plt.plot(users, stats["resps"])
+	plt.errorbar(users, stats["resps"], yerr=stats["cis"], fmt=".")
 	plt.title("Response Times vs Num Users")
 	plt.ylabel("Response Times (s)")
 	plt.xlabel("Num Users")

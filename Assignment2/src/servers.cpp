@@ -249,8 +249,13 @@ void Server::FinishService(const Event& e)
 	req.serviceResponseTimes[serverId] += resp;
 	req.serviceTimes[serverId] += serv;
 
-	if (req.ret == C_TIMEOUT) bad++;
-	else {good++; req.setReturnStatus(GOOD);}
+	if (req.ret == (int)C_TIMEOUT) 
+		bad++;
+	else 
+	{
+		good++; 
+		req.setReturnStatus(GOOD);
+	}
 	responseTimes.push_back(resp);
 	serviceTimes.push_back(serv);
 	req.activeServer = routeNext();

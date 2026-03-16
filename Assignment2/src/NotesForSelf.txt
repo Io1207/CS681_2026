@@ -32,3 +32,14 @@ Some questions:
 
 - just a continuation of the previous point. Scratch the old idea and consider the alternate version of updateMetrics and 
   maybe have an option between both. If you don't want to track the path through the network, then can go by the typical version o/w the event argument version
+
+
+TODO:
+measured vs MVA vs simulation-model
+(maybe run MVA on spreadsheets, i don't trust my code)
+
+get server utilizations
+
+get confidence intervals
+
+run for a network

@@ -1,0 +1,16 @@
+Tink time almost contant at 15s
+Very low ease in time, limited buffer. expect to see many drops
+high timeouts
+
+expected saturation was 210 users - achieved
+see sharp rise after that 
+
+max-resp time ~ 7s
+theoretically - avg service 0.07s, 100 size buffer gives ~7s 
+
+no client timeouts - no badPut
+throughput looks good, max around 14 req/s 
+theoretically, 14.28 - matches
+
+drops increase linearly after around 300 users
+need to verify with theory 

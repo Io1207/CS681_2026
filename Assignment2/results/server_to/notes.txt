@@ -1,0 +1,2 @@
+server timeout was set to 5s
+when server starts timing out, we see throughput dropping

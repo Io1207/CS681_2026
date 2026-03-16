@@ -1,0 +1,5 @@
+resp times increase for load level near saturation
+as number being processed (currently have a thread) increase, 
+each request has to wait more, increasing the response time.
+
+not backing this up with any calculations

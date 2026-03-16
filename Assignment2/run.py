@@ -89,7 +89,7 @@ def run_sim(sim_dir):
         # os.system(f"touch main_{i}")
     for i in range (1,11):
         os.system(f"mkdir -p {sim_dir}/run_{i}")
-    seed = np.random.randint(0, 1000000000)
+    seed = np.random.randint(0, 10000)
     
     os.system(f"./src/sim ./{sim_dir}/ {seed}")
     
@@ -151,8 +151,8 @@ def welch_cutoff(consolidated_file_name, r, m, win_size, tol = 0.0025):
         plt.title("Window Means (for Welch)")
         plt.show()
         plt.close()
-        for i in range(m - win_size + 1):
-            if abs(window_means[i] - window_means[math.floor(i + m * 0.05)]) < tol:
+        for i in range(m - win_size + 1 - 10):
+            if abs(window_means[i] - window_means[i + 10]) < tol:
                 cutoff_time = i + win_size
                 break
     return cutoff_time

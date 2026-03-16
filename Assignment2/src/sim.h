@@ -101,7 +101,7 @@ public:
     ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> outProbs);
     Time thinkTime();
     int route();
-    inline static const int doomThresh = 10000000;
+    inline static const int doomThresh = 10000;
 };
 
 

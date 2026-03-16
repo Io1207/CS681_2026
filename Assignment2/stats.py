@@ -11,13 +11,14 @@ def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 	if (cutoff is None):
 		m = consolidate(sim_dir, num_runs)
 		cutoff = welch_cutoff(f"{sim_dir}/consolidated.tsv", num_runs, m, window)
-	
+	print(sim_dir)
 	runs = []
 	for i in range(1,num_runs+1):
 		dir = f"{sim_dir}/run_{i}"
 		df = pd.read_csv(f"{dir}/main.log", sep=',',names=main_cols,header=None)
 		steady = df.iloc[cutoff:]
 		av_resp = steady['resp'].mean()
+		# print(len(steady))
 		testTime = steady['time'].iloc[-1] - steady['time'].iloc[0]
 		goodput = (steady['good'].iloc[-1] - steady['good'].iloc[0]) / testTime
 		badput = (steady['bad'].iloc[-1] - steady['bad'].iloc[0]) / testTime
@@ -66,6 +67,37 @@ def get_exp_stats(dirname, users, num_runs, window = 40, cutoff = None):
 		"drate" : drates
 	}
 
+def gen_multiple_tput(dirlist, lbl_list, save_file, users, num_runs, window = 40, cutoff = None):
+	stats_list = []
+	for dir in dirlist:
+		s = get_exp_stats(dir, users, num_runs, window, cutoff)
+		stats_list.append(s)
+
+	for i in range(len(stats_list)):
+		plt.plot(users, stats_list[i]["tputs"], label = lbl_list[i])
+	plt.title("Throughput vs Num Users")
+	plt.ylabel(" Throughput (req/s)")
+	plt.xlabel("Num Users")
+	plt.legend()
+	plt.savefig(save_file)
+	plt.close()
+
+def gen_multiple_resp(dirlist, lbl_list, save_file, users, num_runs, window = 40, cutoff = None):
+	stats_list = []
+	for dir in dirlist:
+		s = get_exp_stats(dir, users, num_runs, window, cutoff)
+		stats_list.append(s)
+
+	for i in range(len(stats_list)):
+		plt.plot(users, stats_list[i]["resps"], label = lbl_list[i])
+	plt.title("Response Times vs Num Users")
+	plt.ylabel("Response Times (req/s)")
+	plt.xlabel("Num Users")
+	plt.legend()
+	plt.savefig(save_file)
+	plt.close()
+	
+
 def plot_stats(dirname, users, stats):
 	plt.plot(users, stats["resps"])
 	plt.title("Response Times vs Num Users")
@@ -74,9 +106,9 @@ def plot_stats(dirname, users, stats):
 	plt.savefig(f"{dirname}/resp.png")
 	plt.close()
 
-	plt.plot(users, stats["gputs"], label = "GoodPut")
-	plt.plot(users, stats["bputs"], label = "BadPut")
-	plt.plot(users, stats["tputs"], label = "ThroughPut", linestyle = '--')
+	plt.plot(users, stats["gputs"], label = "GoodPut", color='green')
+	plt.plot(users, stats["bputs"], label = "BadPut", color='red')
+	plt.plot(users, stats["tputs"], label = "ThroughPut", linestyle = '--', color='orange')
 
 	plt.title("Throughputs vs Num Users")
 	plt.xlabel("Num Users")

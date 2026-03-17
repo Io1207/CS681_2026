@@ -61,6 +61,14 @@ Config::Config(string filename) {
 
         s.outProbs = adjMatrix[i+1];
     }
+
+    // int changePresent;
+    // f >> changePresent;
+    // if (!changePresent) return;
+    // else {
+    //     f >> numChanges;
+    //     f >> nextChangeTime;
+    // }
 }
 
 ClientNode::ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> _outProbs):
@@ -112,6 +120,9 @@ Simulation::Simulation(Config c, int seed, string dirname) : cfg(c), rng(seed),
         // requests.emplace_back(i, cfg.numServers, sampleClientTimeout());
         schedule(lastScheduled, LEAVE_CLIENT, client.route(), i, i);
     }
+    if (cfg.numChanges > 0) {
+        schedule(cfg.nextChangeTime, CONFIG_CHANGE, -1, -1);
+    }
 }
 
 void Simulation::schedule(Time t, EventTypes type, int sId, int reqId, int coreId) {
@@ -136,11 +147,20 @@ Time Simulation::thinkTime() {
     return cfg.thinkMin + rng.lognormal(0.0,cfg.thinkVar);    
 }
 
-void Simulation::run() {
+// void Simulation::handleConfigChange(Event &e) {
+//     schedule(fel.end().time, CHANGE, -1, -1);
+// }
+
+void Simulation::run(vector<double>& visit, vector<double>& service_time, vector<double>& response_time) {
     Event e;
     while (!fel.empty()) {
         if (client.visitCount >= cfg.numDelays) {
             fel = {};
+            for (int i=0;i<cfg.numServers;i++) {
+                visit[i] +=  servers[i].getVisits();
+                service_time[i] += servers[i].getAvgServiceTime();
+                response_time[i] += servers[i].getAvgResponseTime();
+            }
             break;
         }
         // if(client.doomCount >= ClientNode::doomThresh)
@@ -168,6 +188,9 @@ void Simulation::run() {
             case ENTER_CLIENT: 
                 handleEnterClient(e, getRequest(e.reqId));
                 break;
+            // case CONFIG_CHANGE:
+            //     handleConfigChange(e);
+            //     break;
             // case ENTER_SERVER: 
             //     servers[e.serverId-1].processEvent(e); 
             //     break;
@@ -482,12 +505,14 @@ int main(int argc, char* argv[]) {
     vector<double> drop;
     vector<double> util;
 
-    
+    vector<double> vis_count(cfg.numServers, 0.0);
+    vector<double> service_time(cfg.numServers, 0.0);
+    vector<double> response_time(cfg.numServers, 0.0);
 
     for(int r=0;r<cfg.runs;r++) {
         cfg.run_id = r + 1;
         Simulation sim(cfg, seed+r,dir_name);
-        sim.run();
+        sim.run(vis_count, service_time, response_time);
         auto m = sim.results();
         // resp.push_back(m.avgResp);
         thr.push_back(m.throughput);
@@ -496,6 +521,22 @@ int main(int argc, char* argv[]) {
         drop.push_back(m.dropRate);
         // util.push_back(m.util);
     }
+    transform(vis_count.begin(), vis_count.end(), vis_count.begin(), [cfg] (double x) {return x/(cfg.numDelays*cfg.runs);});
+    // getting avgServiceTime and avgResponseTime for each server
+    for (int i=0;i<cfg.numServers;i++) {
+        service_time[i] /= (cfg.runs*vis_count[i]) + 1e-6;
+        response_time[i] /= (cfg.runs*vis_count[i]) + 1e-6;
+    }
+    cout << "------------------------------------------------------------------------------" << endl;
+    cout << cfg.users << endl << endl;
+    cout << "Visits: ";
+    for(int i=0;i<cfg.numServers;i++) cout << vis_count[i] << " ";
+    cout << "\nService Time: ";
+    for(int i=0;i<cfg.numServers;i++) cout << service_time[i] << " ";
+    cout << "\nResponse Time: ";
+    for(int i=0;i<cfg.numServers;i++) cout << response_time[i] << " ";
+    cout << "\n";
+    cout << "------------------------------------------------------------------------------" << endl;
 
     // auto [meanR,ciR] = meanCI(resp);
     // cout<<"Avg Response Time: "<<meanR<<" +/- "<<ciR<<"\n";

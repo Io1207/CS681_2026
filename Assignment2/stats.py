@@ -4,9 +4,11 @@ import matplotlib.pyplot as plt
 from run import welch_cutoff
 from run_welch import consolidate
 import math
+import os
 
 
 main_cols = ['time','good','bad','dropped','completed','resp']
+serv_cols = ['time','good','bad','dropped','resp','serv','active','num']
 
 def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 	if (cutoff is None):
@@ -23,9 +25,10 @@ def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 		testTime = steady['time'].iloc[-1] - steady['time'].iloc[0]
 		goodput = (steady['good'].iloc[-1] - steady['good'].iloc[0]) / testTime
 		badput = (steady['bad'].iloc[-1] - steady['bad'].iloc[0]) / testTime
-		throughput = (steady['completed'].iloc[-1] - steady['completed'].iloc[0]) / testTime
-		drops = 100 * (steady['dropped'].iloc[-1] - steady['dropped'].iloc[0]) / len(steady)
-		
+		comp = (steady['completed'].iloc[-1] - steady['completed'].iloc[0])
+		drop = (steady['dropped'].iloc[-1] - steady['dropped'].iloc[0])
+		throughput =comp / testTime
+		drops =  100 * drop / (drop + comp)
 		runs.append([
 			av_resp,
 			goodput,
@@ -38,11 +41,12 @@ def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 	for i in range(5):
 		metr[i] = np.mean(runs[:,i])
 
-	#90% confidence intervals
+	#95% confidence intervals
 	resps = runs[:,0]
-	mean = np.mean(resps)
+	# print(resps)
 	std = np.std(resps) 
-	ci = 1.645 * std / math.sqrt(10)
+	ci = 1.96 * std / math.sqrt(len(resps))
+	# print(ci)
 
 	return {
 		"resp" : metr[0],
@@ -53,16 +57,49 @@ def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 		"drate": metr[4],
 	}
 
-def get_exp_stats(dirname, users, num_runs, window = 40, cutoff = None):
+def get_serv_stats(dir, serv_id, num_runs, cutoff=100):
+	runs = []
+	for i in range(num_runs):
+		file = f"{dir}/run_{i+1}/server_{serv_id}.log"
+		df = pd.read_csv(file, sep=',',names=serv_cols,header=None)
+		active = df['active'].iloc[-1] - df["active"].iloc[0]
+		num_in = df['num'].iloc[-1] - df['num'].iloc[0]
+		time = df['time'].iloc[-1] - df['time'].iloc[0]
+		throughput = (df['good'].iloc[-1] - df['bad'].iloc[0]) / time
+		throughput += (df['good'].iloc[-1] - df['good'].iloc[0]) / time
+		runs.append([
+			active / time,
+			num_in / time,
+			throughput
+		])
+
+	metr = [0,0,0]
+	runs = np.asarray(runs)
+	for i in range(3):
+		metr[i] = np.mean(runs[:,i])
+	return {
+		"util" : metr[0],
+		"num"  : metr[1],
+		"tput" : metr[2],
+	}
+
+
+
+def get_exp_stats(dirname, users, num_runs, num_servers = 1, window = 40, cutoff = None):
 	resps = []
 	cis   = []
 	gputs = []
 	bputs = []
 	tputs = []
 	drates= []
+	servers = []
 
 	for u in users:
 		stats = get_sim_stats(f"{dirname}/{u}_users/", num_runs, window, cutoff)
+		serv_stats = []
+		for i in range(num_servers):
+			serv_stats.append(get_serv_stats(f"{dirname}/{u}_users",i+1,num_runs,cutoff))
+		servers.append(serv_stats)
 		resps.append(stats["resp"])
 		cis.append(stats["ci"])
 		gputs.append(stats["gput"])
@@ -76,7 +113,8 @@ def get_exp_stats(dirname, users, num_runs, window = 40, cutoff = None):
   		"gputs" : gputs,
 		"bputs" : bputs,
 		"tputs" : tputs,
-		"drate" : drates
+		"drate" : drates,
+		"servers": servers
 	}
 
 def gen_multiple_tput(dirlist, lbl_list, save_file, users, num_runs, window = 40, cutoff = None):
@@ -109,10 +147,9 @@ def gen_multiple_resp(dirlist, lbl_list, save_file, users, num_runs, window = 40
 	plt.savefig(save_file)
 	plt.close()
 	
-
 def plot_stats(dirname, users, stats):
-	plt.plot(users, stats["resps"])
-	plt.errorbar(users, stats["resps"], yerr=stats["cis"], fmt=".")
+	# plt.plot(users, stats["resps"])
+	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="orange", lw=0.5)
 	plt.title("Response Times vs Num Users")
 	plt.ylabel("Response Times (s)")
 	plt.xlabel("Num Users")
@@ -136,6 +173,59 @@ def plot_stats(dirname, users, stats):
 	plt.xlabel("Num Users")
 	plt.savefig(f"{dirname}/drate.png")
 	plt.close()
+
+	servers = stats["servers"]
+	# print(servers)
+	if(len(servers) > 0):
+		for i in range(len(servers[0])):
+			os.system(f"mkdir -p {dirname}/server_{i+1}")
+			utils = []
+			nums  = []
+			tputs = []
+			for u_stat in servers:
+				# print(u_stat)
+				# print(i)
+				utils.append(u_stat[i]["util"])
+				nums.append (u_stat[i]["num"])
+				tputs.append(u_stat[i]["tput"])
+			plt.title(f"Server {i+1}, Utilization vs Users")
+			plt.ylabel("Utilization")
+			plt.xlabel("Users")
+			plt.plot(users, utils)
+			plt.savefig(f"{dirname}/server_{i+1}/util.png")
+			plt.close()
+
+			plt.title(f"Server {i+1}, Throughput vs Users")
+			plt.ylabel("Throughput (req/s)")
+			plt.xlabel("Users")
+			# print(len(users))
+			# print(len(utils))
+			# print(len(nums))
+			# print(len(tputs))
+
+			plt.plot(users, tputs)
+			plt.savefig(f"{dirname}/server_{i+1}/tput.png")
+			plt.close()
+
+			plt.title(f"Server {i+1}, Number of Requests in System vs Users")
+			plt.ylabel("N")
+			plt.xlabel("Users")
+			plt.plot(users, nums)
+			plt.savefig(f"{dirname}/server_{i+1}/nums.png")
+			plt.close()
+
+			plt.title(f"Server {i+1}, Throughput vs Utilization")
+			plt.ylabel("Throughput")
+			plt.xlabel("Utilization")
+			plt.plot(utils, tputs)
+			plt.savefig(f"{dirname}/server_{i+1}/tpus_util.png")
+			plt.close()
+
+
+
+
+
+
 
 
 

@@ -106,21 +106,22 @@ def sim_cfg_from_expt(dirname):
     exp_file = open(exp_cfg, "r")
     lines = exp_file.readlines()
     start, stop, step = map(int, lines[1].strip().split())
+    servers = int(lines[7].strip().split()[0])
     dirs = []
     for u in range(start,stop,step):
         os.system(f"mkdir -p {dirname}/{u}_users")
         gen_sim_cfg(lines, u, f"{dirname}/{u}_users/config.txt")
         dirs.append(f"{dirname}/{u}_users")
-    return dirs, range(start, stop, step)
+    return dirs, range(start, stop, step), servers
 
 
 def run_exp(exp_dir):
     print(exp_dir)
-    sims, users = sim_cfg_from_expt(exp_dir)
+    sims, users, servers = sim_cfg_from_expt(exp_dir)
     for s in sims:
         run_sim(s)
 
-    stats = get_exp_stats(exp_dir, users, num_runs)
+    stats = get_exp_stats(exp_dir, users, num_runs, num_servers=servers)
     plot_stats(exp_dir, users, stats)
 
 

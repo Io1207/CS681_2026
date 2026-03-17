@@ -100,6 +100,7 @@ Simulation::Simulation(Config c, int seed, string dirname) : cfg(c), rng(seed),
     Time lastScheduled = 0.0;
     // servers.emplace_back(0,cfg.scfgs[0],this,0,)
     // servers.emplace_back();
+    servers.reserve(cfg.numServers);
     for(int i=0;i<cfg.numServers;i++)
     {
         // Server serv;

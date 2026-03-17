@@ -120,7 +120,7 @@ def get_exp_stats(dirname, users, num_runs, num_servers = 1, window = 40, cutoff
 def gen_multiple_tput(dirlist, lbl_list, save_file, users, num_runs, window = 40, cutoff = None):
 	stats_list = []
 	for dir in dirlist:
-		s = get_exp_stats(dir, users, num_runs, window, cutoff)
+		s = get_exp_stats(dir, users, num_runs, 1, window, cutoff)
 		stats_list.append(s)
 
 	for i in range(len(stats_list)):
@@ -129,13 +129,14 @@ def gen_multiple_tput(dirlist, lbl_list, save_file, users, num_runs, window = 40
 	plt.ylabel(" Throughput (req/s)")
 	plt.xlabel("Num Users")
 	plt.legend()
+	plt.grid(True)
 	plt.savefig(save_file)
 	plt.close()
 
 def gen_multiple_resp(dirlist, lbl_list, save_file, users, num_runs, window = 40, cutoff = None):
 	stats_list = []
 	for dir in dirlist:
-		s = get_exp_stats(dir, users, num_runs, window, cutoff)
+		s = get_exp_stats(dir, users, num_runs, 1, window, cutoff)
 		stats_list.append(s)
 
 	for i in range(len(stats_list)):
@@ -144,22 +145,35 @@ def gen_multiple_resp(dirlist, lbl_list, save_file, users, num_runs, window = 40
 	plt.ylabel("Response Times (req/s)")
 	plt.xlabel("Num Users")
 	plt.legend()
+	plt.grid(True)
 	plt.savefig(save_file)
 	plt.close()
-	
+
+def get_mva_stats(file, users):
+    df = pd.read_csv(file)
+    filtered = df[df["M"].isin(users)]
+    filtered = filtered.set_index("M").loc[users]
+    result = {}
+    for col in df.columns:
+        if col != "M":
+            result[col] = filtered[col].tolist()
+    return result
+
 def plot_stats(dirname, users, stats):
 	# plt.plot(users, stats["resps"])
 	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="orange", lw=0.5)
 	plt.title("Response Times vs Num Users")
 	plt.ylabel("Response Times (s)")
 	plt.xlabel("Num Users")
+	plt.grid(True)
 	plt.savefig(f"{dirname}/resp.png")
 	plt.close()
+
 
 	plt.plot(users, stats["gputs"], label = "GoodPut", color='green')
 	plt.plot(users, stats["bputs"], label = "BadPut", color='red')
 	plt.plot(users, stats["tputs"], label = "ThroughPut", linestyle = '--', color='orange')
-
+	plt.grid(True)
 	plt.title("Throughputs vs Num Users")
 	plt.xlabel("Num Users")
 	plt.ylabel("Throughputs (req/s)")
@@ -171,6 +185,7 @@ def plot_stats(dirname, users, stats):
 	plt.title("Drop Rate vs Num Users")
 	plt.ylabel("Drop Rate (%)")
 	plt.xlabel("Num Users")
+	plt.grid(True)
 	plt.savefig(f"{dirname}/drate.png")
 	plt.close()
 
@@ -192,6 +207,7 @@ def plot_stats(dirname, users, stats):
 			plt.ylabel("Utilization")
 			plt.xlabel("Users")
 			plt.plot(users, utils)
+			plt.grid(True)
 			plt.savefig(f"{dirname}/server_{i+1}/util.png")
 			plt.close()
 
@@ -203,6 +219,7 @@ def plot_stats(dirname, users, stats):
 			# print(len(nums))
 			# print(len(tputs))
 
+			plt.grid(True)
 			plt.plot(users, tputs)
 			plt.savefig(f"{dirname}/server_{i+1}/tput.png")
 			plt.close()
@@ -210,6 +227,7 @@ def plot_stats(dirname, users, stats):
 			plt.title(f"Server {i+1}, Number of Requests in System vs Users")
 			plt.ylabel("N")
 			plt.xlabel("Users")
+			plt.grid(True)
 			plt.plot(users, nums)
 			plt.savefig(f"{dirname}/server_{i+1}/nums.png")
 			plt.close()
@@ -217,10 +235,74 @@ def plot_stats(dirname, users, stats):
 			plt.title(f"Server {i+1}, Throughput vs Utilization")
 			plt.ylabel("Throughput")
 			plt.xlabel("Utilization")
-			plt.plot(utils, tputs)
+			plt.grid(True)
+			plt.scatter(utils, tputs)
 			plt.savefig(f"{dirname}/server_{i+1}/tpus_util.png")
 			plt.close()
 
+def plot_with_mva(dirname, users, stats, mvafile, realdata = None):
+	mva_stats = get_mva_stats(mvafile, users)
+
+	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="orange", lw=0.5, label="simulated")
+	plt.plot(users, mva_stats["resp"], label="mva", color='red', ls="--")
+	if(realdata):
+		plt.plot(users, realdata["resp"], label="measured")
+	plt.title("Response Times vs Num Users")
+	plt.ylabel("Response Times (s)")
+	plt.xlabel("Num Users")
+	plt.grid(True)
+	plt.legend()
+	plt.savefig(f"{dirname}/mva_resp.png")
+	plt.close()
+
+	if(realdata):
+		plt.plot(users, stats["drate"], label="simulated")
+		plt.plot(realdata["drate"], label="measured")
+		plt.title("Drop Rate vs Num Users")
+		plt.ylabel("Drop Rate (%)")
+		plt.xlabel("Num Users")
+		plt.grid(True)
+		plt.savefig(f"{dirname}/mva_drate.png")
+		plt.close()
+
+
+	servers = stats["servers"]
+	if(len(servers) > 0):
+		for i in range(1):
+			os.system(f"mkdir -p {dirname}/server_{i+1}")
+			utils = []
+			nums  = []
+			tputs = []
+			for u_stat in servers:
+				# print(u_stat)
+				# print(i)
+				utils.append(u_stat[i]["util"])
+				nums.append (u_stat[i]["num"])
+				tputs.append(u_stat[i]["tput"])
+			plt.title(f"Server Utilization vs Users")
+			plt.ylabel("Utilization")
+			plt.xlabel("Users")
+			plt.plot(users, utils, label="simulated")
+			plt.plot(users, mva_stats["util"], label = "mva", color='red', ls="--")
+			if(realdata):
+				plt.plot(users, realdata["util"], label="measured")
+			plt.legend()
+			plt.grid(True)
+			plt.savefig(f"{dirname}/mva_util.png")
+			plt.close()
+
+			plt.plot(users, stats["gputs"], label = "Simulated GoodPut", color='green')
+			plt.plot(users, stats["bputs"], label = "Simulated BadPut", color='red')
+			plt.plot(users, stats["tputs"], label = "Simulated ThroughPut", linestyle = '--', color='orange')
+			plt.plot(users, mva_stats["tput"], label = "MVA Throughput", color='blue', ls=":")
+			if(realdata):
+				plt.plot(users, realdata["tput"], label="measured")
+			plt.grid(True)
+			plt.legend()
+			plt.savefig(f"{dirname}/mva_tput.png")
+			plt.close()
+
+			
 
 
 

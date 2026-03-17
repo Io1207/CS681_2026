@@ -120,9 +120,9 @@ Simulation::Simulation(Config c, int seed, string dirname) : cfg(c), rng(seed),
         // requests.emplace_back(i, cfg.numServers, sampleClientTimeout());
         schedule(lastScheduled, LEAVE_CLIENT, client.route(), i, i);
     }
-    if (cfg.numChanges > 0) {
-        schedule(cfg.nextChangeTime, CONFIG_CHANGE, -1, -1);
-    }
+    // if (cfg.numChanges > 0) {
+    //     schedule(cfg.nextChangeTime, CONFIG_CHANGE, -1, -1);
+    // }
 }
 
 void Simulation::schedule(Time t, EventTypes type, int sId, int reqId, int coreId) {

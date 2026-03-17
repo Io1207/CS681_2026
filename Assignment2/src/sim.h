@@ -214,7 +214,7 @@ class Simulation {
             Request::ctr = 0;
         }
 
-        void run();
+        void run(vector<double>& visit, vector<double>& service_time, vector<double>& response_time);
         Request& getRequest(int reqId);
         void clientTimeout(Request& req);
         Time simTime();

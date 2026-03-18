@@ -45,7 +45,7 @@ def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 	resps = runs[:,0]
 	# print(resps)
 	std = np.std(resps) 
-	ci = 1.96 * std / math.sqrt(len(resps))
+	ci = 1.645 * std / math.sqrt(len(resps))
 	# print(ci)
 
 	return {
@@ -59,14 +59,17 @@ def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 
 def get_serv_stats(dir, serv_id, num_runs, cutoff=100):
 	runs = []
+	if (cutoff is None):
+		m = consolidate(dir, num_runs)
+		cutoff = welch_cutoff(f"{dir}/consolidated.tsv", num_runs, m, 40)
 	for i in range(num_runs):
 		file = f"{dir}/run_{i+1}/server_{serv_id}.log"
 		df = pd.read_csv(file, sep=',',names=serv_cols,header=None)
 		active = df['active'].iloc[-1] - df["active"].iloc[0]
 		num_in = df['num'].iloc[-1] - df['num'].iloc[0]
 		time = df['time'].iloc[-1] - df['time'].iloc[0]
-		throughput = (df['good'].iloc[-1] - df['bad'].iloc[0]) / time
-		throughput += (df['good'].iloc[-1] - df['good'].iloc[0]) / time
+		throughput = (df['bad'].iloc[-1] - df['bad'].iloc[cutoff]) / time
+		throughput += (df['good'].iloc[-1] - df['good'].iloc[cutoff]) / time
 		runs.append([
 			active / time,
 			num_in / time,
@@ -161,7 +164,7 @@ def get_mva_stats(file, users):
 
 def plot_stats(dirname, users, stats):
 	# plt.plot(users, stats["resps"])
-	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="orange", lw=0.5)
+	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="red", lw=0.7, elinewidth=0.9)
 	plt.title("Response Times vs Num Users")
 	plt.ylabel("Response Times (s)")
 	plt.xlabel("Num Users")
@@ -243,7 +246,7 @@ def plot_stats(dirname, users, stats):
 def plot_with_mva(dirname, users, stats, mvafile, realdata = None):
 	mva_stats = get_mva_stats(mvafile, users)
 
-	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="orange", lw=0.5, label="simulated")
+	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="orange", lw=0.8, label="simulated")
 	plt.plot(users, mva_stats["resp"], label="mva", color='red', ls="--")
 	if(realdata):
 		plt.plot(users, realdata["resp"], label="measured")

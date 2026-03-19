@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from run import welch_cutoff
-from run_welch import consolidate
+from welch import consolidate
 import math
 import os
 
@@ -57,30 +57,36 @@ def get_sim_stats(sim_dir, num_runs, window = 40, cutoff = None):
 		"drate": metr[4],
 	}
 
-def get_serv_stats(dir, serv_id, num_runs, cutoff=100):
+def get_serv_stats(dir, serv_id, num_runs, cutoff=None):
 	runs = []
+	if (cutoff is None):
+		m = consolidate(dir, num_runs)
+		cutoff = welch_cutoff(f"{dir}/consolidated.tsv", num_runs, m, 40)
 	for i in range(num_runs):
 		file = f"{dir}/run_{i+1}/server_{serv_id}.log"
 		df = pd.read_csv(file, sep=',',names=serv_cols,header=None)
 		active = df['active'].iloc[-1] - df["active"].iloc[0]
 		num_in = df['num'].iloc[-1] - df['num'].iloc[0]
 		time = df['time'].iloc[-1] - df['time'].iloc[0]
-		throughput = (df['good'].iloc[-1] - df['bad'].iloc[0]) / time
-		throughput += (df['good'].iloc[-1] - df['good'].iloc[0]) / time
+		throughput = (df['bad'].iloc[-1] - df['bad'].iloc[cutoff]) / time
+		throughput += (df['good'].iloc[-1] - df['good'].iloc[cutoff]) / time
+		resp = df['resp'].mean()
 		runs.append([
 			active / time,
 			num_in / time,
-			throughput
+			throughput,
+			resp
 		])
 
-	metr = [0,0,0]
+	metr = [0,0,0,0]
 	runs = np.asarray(runs)
-	for i in range(3):
+	for i in range(4):
 		metr[i] = np.mean(runs[:,i])
 	return {
 		"util" : metr[0],
 		"num"  : metr[1],
 		"tput" : metr[2],
+		"resp" : metr[3]
 	}
 
 
@@ -159,9 +165,19 @@ def get_mva_stats(file, users):
             result[col] = filtered[col].tolist()
     return result
 
+def read_stats(file_path):
+    df = pd.read_csv(file_path)
+    users = df["M"].tolist()
+    stats = {}
+    for col in df.columns:
+        if col != "M":
+            stats[col] = df[col].tolist()
+	
+    return users, stats
+
 def plot_stats(dirname, users, stats):
 	# plt.plot(users, stats["resps"])
-	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="orange", lw=0.5)
+	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="red", lw=0.8)
 	plt.title("Response Times vs Num Users")
 	plt.ylabel("Response Times (s)")
 	plt.xlabel("Num Users")
@@ -232,21 +248,35 @@ def plot_stats(dirname, users, stats):
 			plt.savefig(f"{dirname}/server_{i+1}/nums.png")
 			plt.close()
 
+			plt.title(f"Server {i+1}, Server Response Time vs Users")
+			plt.ylabel("Response Time (ms)")
+			plt.xlabel("Users")
+			plt.grid(True)
+			plt.plot(users, nums)
+			plt.savefig(f"{dirname}/server_{i+1}/resp.png")
+			plt.close()
+
 			plt.title(f"Server {i+1}, Throughput vs Utilization")
 			plt.ylabel("Throughput")
 			plt.xlabel("Utilization")
 			plt.grid(True)
 			plt.scatter(utils, tputs)
+			m, c = np.polyfit(utils, tputs, 1)
+			x = np.linspace(0, np.max(utils), 10)
+			y = m*x + c
+			plt.plot(x, y, ls="--")
 			plt.savefig(f"{dirname}/server_{i+1}/tpus_util.png")
 			plt.close()
 
-def plot_with_mva(dirname, users, stats, mvafile, realdata = None):
+
+
+def plot_with_mva(dirname, users, stats, mvafile, realusers=None, realdata = None):
 	mva_stats = get_mva_stats(mvafile, users)
 
 	plt.errorbar(users, stats["resps"], yerr=stats["cis"],color="blue",ecolor="orange", lw=0.5, label="simulated")
 	plt.plot(users, mva_stats["resp"], label="mva", color='red', ls="--")
 	if(realdata):
-		plt.plot(users, realdata["resp"], label="measured")
+		plt.plot(realusers, realdata["resp"], label="measured")
 	plt.title("Response Times vs Num Users")
 	plt.ylabel("Response Times (s)")
 	plt.xlabel("Num Users")
@@ -257,11 +287,12 @@ def plot_with_mva(dirname, users, stats, mvafile, realdata = None):
 
 	if(realdata):
 		plt.plot(users, stats["drate"], label="simulated")
-		plt.plot(realdata["drate"], label="measured")
+		plt.plot(realusers, realdata["drate"], label="measured")
 		plt.title("Drop Rate vs Num Users")
 		plt.ylabel("Drop Rate (%)")
 		plt.xlabel("Num Users")
 		plt.grid(True)
+		plt.legend()
 		plt.savefig(f"{dirname}/mva_drate.png")
 		plt.close()
 
@@ -285,7 +316,7 @@ def plot_with_mva(dirname, users, stats, mvafile, realdata = None):
 			plt.plot(users, utils, label="simulated")
 			plt.plot(users, mva_stats["util"], label = "mva", color='red', ls="--")
 			if(realdata):
-				plt.plot(users, realdata["util"], label="measured")
+				plt.plot(realusers, realdata["util"], label="measured")
 			plt.legend()
 			plt.grid(True)
 			plt.savefig(f"{dirname}/mva_util.png")
@@ -296,8 +327,9 @@ def plot_with_mva(dirname, users, stats, mvafile, realdata = None):
 			plt.plot(users, stats["tputs"], label = "Simulated ThroughPut", linestyle = '--', color='orange')
 			plt.plot(users, mva_stats["tput"], label = "MVA Throughput", color='blue', ls=":")
 			if(realdata):
-				plt.plot(users, realdata["tput"], label="measured")
+				plt.plot(realusers, realdata["tput"], label="measured")
 			plt.grid(True)
+			plt.title(f"Throughputs vs Num of Users")
 			plt.legend()
 			plt.savefig(f"{dirname}/mva_tput.png")
 			plt.close()

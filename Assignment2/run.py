@@ -197,6 +197,7 @@ def welch_cutoff(consolidated_file_name, r, m, win_size, tol = 0.0025):
         plt.plot(window_means)
         plt.title("Window Means (for Welch)")
         # plt.show()
+        plt.grid(True)
         plt.close()
         for i in range(m - win_size + 1 - 10):
             if abs(window_means[i] - window_means[i + 10]) < tol:

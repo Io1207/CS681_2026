@@ -23,6 +23,9 @@ struct ServerConfig
 	Time serviceVar = 0.01;
 	Time timeout;
 	vector<double> outProbs;
+
+	void changeServerSettings(vector<double> outProbs, unsigned numCores, unsigned maxThreads, unsigned maxQueue, Time serviceMin, Time serviceVar);
+
 };
 
 struct Thread
@@ -106,6 +109,7 @@ public:
 
 	double getUtilisation() const;
 	double getAvgInServer() const;
+
 
 private:
 	void EnterServer(Request &req);

@@ -25,22 +25,22 @@ Time Simulation::sampleClientTimeout()
 }
 
 Config::Config(string filename) {
-    ifstream f(filename);
+    ifstream configFile(filename);
     // cout << fs::current_path().string() << endl;
     // cout << filename << endl;
-    if (!f.is_open()) {
+    if (!configFile.is_open()) {
         throw runtime_error("Could not open config file");
     }
-    f >> numDelays;
-    f >> users;
-    f >> ease_in >> timeoutMin >> timeoutVar >> thinkMin >> thinkVar;
-    f >> numServers;
+    configFile >> numDelays;
+    configFile >> users;
+    configFile >> ease_in >> timeoutMin >> timeoutVar >> thinkMin >> thinkVar;
+    configFile >> numServers;
 
     adjMatrix.resize(numServers+1);
     for(int i=0;i<=numServers;i++) {
         adjMatrix[i].resize(numServers+1);
         for(int j=0;j<=numServers;j++) {
-            f >> adjMatrix[i][j];
+            configFile >> adjMatrix[i][j];
         }
     }
 
@@ -48,27 +48,28 @@ Config::Config(string filename) {
     for(int i=0; i<numServers; i++) {
         ServerConfig &s = scfgs[i];
 
-        f >> s.numCores >> s.maxThreads >> s.maxQueue;
+        configFile >> s.numCores >> s.maxThreads >> s.maxQueue;
         
         int dist;
-        f >> dist >> s.serviceMin >> s.serviceVar;
+        configFile >> dist >> s.serviceMin >> s.serviceVar;
         if (dist == 0) s.serviceDist = ServerConfig::CONST;
         else if (dist == 1) s.serviceDist = ServerConfig::UNIFORM;
         else s.serviceDist = ServerConfig::EXP;
 
-        f >> s.contextSwitchTime >> s.roundRobinTimeout;
-        f >> s.timeout;
+        configFile >> s.contextSwitchTime >> s.roundRobinTimeout;
+        configFile >> s.timeout;
 
         s.outProbs = adjMatrix[i+1];
     }
 
-    // int changePresent;
-    // f >> changePresent;
-    // if (!changePresent) return;
-    // else {
-    //     f >> numChanges;
-    //     f >> nextChangeTime;
-    // }
+    int changePresent;
+    configFile >> changePresent;
+    if (!changePresent) return;
+    else {
+        configFile >> numChanges;
+        configFile >> nextChangeTime >> nextChangeType;
+    }
+    this->linesRead = 7 + (numServers+1)*numServers + numServers*9 + 2;
 }
 
 ClientNode::ClientNode(int users, Time thinkMin, Time thinkVar, unsigned seed, vector<double> _outProbs):
@@ -104,6 +105,7 @@ Simulation::Simulation(Config c, int seed, string dirname) : cfg(c), rng(seed),
 
     log_file.open(dirname + "/run_" + to_string(cfg.run_id) + "/main.log");
     event_log.open(dirname + "/run_" + to_string(cfg.run_id) + "/events.log");
+    config.open(dirname + "/config.txt");
     now = 0.0;
     Time lastScheduled = 0.0;
     // servers.emplace_back(0,cfg.scfgs[0],this,0,)
@@ -120,7 +122,55 @@ Simulation::Simulation(Config c, int seed, string dirname) : cfg(c), rng(seed),
         schedule(lastScheduled, LEAVE_CLIENT, client.route(), i, i);
     }
     if (cfg.numChanges > 0) {
-        schedule(cfg.nextChangeTime, CONFIG_CHANGE, -1, -1);
+        schedule(cfg.nextChangeTime, SYS_SET_CHANGE, -1, -1);
+        cfg.numChanges--;
+    }
+}
+
+void Simulation::handleConfigChange(Event &e) {
+    // This is where we will handle any dynamic changes to the system configuration. For now, we will just schedule the next change.
+    vector<vector<double>> newAdjMatrix (cfg.numServers+1, vector<double>(cfg.numServers+1));
+    int id;
+    switch ((int)cfg.nextChangeType) {
+        case 0:
+            for (int i = 0; i < cfg.numServers; i++) {
+                config >> id;
+                config >> cfg.scfgs[id - 1].numCores >> cfg.scfgs[id - 1].maxThreads >> cfg.scfgs[id - 1].maxQueue;
+                config >> cfg.scfgs[id - 1].serviceMin >> cfg.scfgs[id - 1].serviceVar;
+            }
+            break;
+        case 1:
+            for (int i = 0; i < cfg.numServers+1; i++) {
+                for (int j = 0; j < cfg.numServers+1; j++) {
+                    config >> newAdjMatrix[i][j];
+                }
+            }
+            for (int i = 0; i < cfg.numServers; i++) {
+                cfg.scfgs[i].outProbs = newAdjMatrix[i+1];
+            }
+            break;
+        case 2:
+            for (int i = 0; i < cfg.numServers+1; i++) {
+                for (int j = 0; j < cfg.numServers+1; j++) {
+                    config >> newAdjMatrix[i][j];
+                }
+            }
+            for (int i = 0; i < cfg.numServers; i++) {
+                cfg.scfgs[i].outProbs = newAdjMatrix[i+1];
+            }
+            for (int i = 0; i < cfg.numServers; i++) {
+                config >> id;
+                config >> cfg.scfgs[id - 1].numCores >> cfg.scfgs[id - 1].maxThreads >> cfg.scfgs[id - 1].maxQueue;
+                config >> cfg.scfgs[id - 1].serviceMin >> cfg.scfgs[id - 1].serviceVar;
+            }
+            break;
+        default:
+            throw runtime_error("Invalid change type");
+    }
+    if (cfg.numChanges > 0) {
+        config >> cfg.nextChangeTime >> cfg.nextChangeType;
+        schedule(cfg.nextChangeTime, SYS_SET_CHANGE, -1, -1);
+        cfg.numChanges--;
     }
 }
 
@@ -162,18 +212,12 @@ void Simulation::run(vector<double>& visit, vector<double>& service_time, vector
             }
             break;
         }
-        // if(client.doomCount >= ClientNode::doomThresh)
-        // {
-        //     fel = {};
-        //     break;
-        // }
         e = fel.top();
         fel.pop();
         now = e.time;
         event_log << e;
         switch (e.type) {
             case LEAVE_CLIENT: 
-                // servers[e.serverId-1].processEvent(Event(e.time, ENTER_SERVER, e.serverId, lastReqId+1));
                 requests.emplace_back(e.coreId , cfg.numServers, sampleClientTimeout()); 
                 schedule(
                     simTime() + requests.back().c_timeout,
@@ -187,20 +231,15 @@ void Simulation::run(vector<double>& visit, vector<double>& service_time, vector
             case ENTER_CLIENT: 
                 handleEnterClient(e, getRequest(e.reqId));
                 break;
-            // case CONFIG_CHANGE:
-            //     handleConfigChange(e);
-            //     break;
-            // case ENTER_SERVER: 
-            //     servers[e.serverId-1].processEvent(e); 
-            //     break;
+            case SYS_SET_CHANGE:
+                handleConfigChange(e);
+                break;
             case CLIENT_TIMEOUT: 
                 clientTimeout(getRequest(e.reqId)); 
-                // scheduleThink(e.reqId, e.time); 
                 break;
             default: 
                 servers[e.serverId-1].processEvent(e); 
                 break;
-            // case SERVER_TIMEOUT: servers[e.serverId].processEvent(e); break;
         }
     }
 }
@@ -510,7 +549,7 @@ int main(int argc, char* argv[]) {
 
     for(int r=0;r<cfg.runs;r++) {
         cfg.run_id = r + 1;
-        Simulation sim(cfg, seed+r,dir_name);
+        Simulation sim(cfg, seed+r, dir_name);
         sim.run(vis_count, service_time, response_time);
         auto m = sim.results();
         // resp.push_back(m.avgResp);

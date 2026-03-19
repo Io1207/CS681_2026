@@ -9,6 +9,45 @@ from stats import *
 exp_dir = ""
 num_runs = 10
 
+def make_change_config(f : io.TextIOWrapper, num_servers):
+    print("How many change events do you want to add?")
+    n = int(input().strip())
+    f.write(str(n) + "\n")
+    
+    print ("To enter a config change event enter in the following format:")
+    print ("Time of change, type of change (described below)")
+    print ("If both routing and server settings change enter \"2\" first")
+    print ("If only routing changes enter \"1\" first")
+    print ("If only server settings change enter \"0\" first")
+    print ("for adjacency matrix change just write in the same format as before")
+    print ("for server setting change write like this (for every single server regardless of whether or not it's settings are being changed): ")
+    print ("sId numCores maxThreads maxQueue serviceMin serviceVar")
+    for i in range(n):
+        print("Change event", i+1)
+        time, changeType = input().strip().split()
+        f.write(time + " " + changeType + "\n")
+        if changeType == "2":
+            # num of lines written = num_servers + 1 (for the adjacency matrix) + num_servers (for the server settings)
+            make_adjacency_matrix(num_servers+1, f)
+            for i in range(num_servers):
+                print("Enter server settings for server", i+1, "like this: ")
+                print("sId numCores maxThreads maxQueue serviceMin serviceVar")
+                x = input().strip()
+                print(x)
+                f.write(x + "\n")
+        elif changeType == "1":
+            # num of lines written = num_servers + 1 (for the adjacency matrix)
+            make_adjacency_matrix(num_servers+1, f)
+        elif changeType == "0":
+            # number of lines written = num_servers
+            for i in range(num_servers):
+                print("Enter server settings for server", i+1, "like this: ")
+                print("sId numCores maxThreads maxQueue serviceMin serviceVar")
+                x = input().strip()
+                print(x)
+                f.write(x + "\n")
+    
+
 def get_server_config(num_servers, f : io.TextIOWrapper):
     # now will ask for server details one by one
     for i in range(num_servers):
@@ -78,6 +117,13 @@ def make_exp_config():
         print("Now will be asking for server details one by one")
         make_adjacency_matrix(num_servers+1,f)
         get_server_config(num_servers,f)
+        print("wtf")
+        print("Any change to the config files? (y/n)")
+        if (str(input()).strip() == "y"):
+            f.write("1\n")
+            make_change_config(f, num_servers)
+        else:
+            f.write("0\n")
     
     f.close()
     # os.system(f"cd ../../")

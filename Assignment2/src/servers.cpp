@@ -411,3 +411,4 @@ void Server::appendLog(Time resp_time, Time serv_time)
 				<< totalActiveTime << ","
 				<< sumTotalInServer << "\n";
 }
+

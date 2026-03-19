@@ -79,6 +79,16 @@ struct Config {
     Time thinkMin;
     Time thinkVar;
 
+    int numChanges = 0;
+    Time nextChangeTime;
+    Time nextChangeType;
+    int linesRead = 0;
+
+    // Config(const Config &) = delete;
+	// Config(Config &&) = default;
+	// Config &operator=(const Config &) = delete;
+	// Config &operator=(Config &&) = default;
+
     // up for discussion for different simulation
     bool sys_other = false;
 
@@ -115,6 +125,7 @@ enum EventTypes {
     FINISH_SERVICE,
     CLIENT_TIMEOUT,
     SERVER_TIMEOUT,
+    SYS_SET_CHANGE
 };
 
 
@@ -153,6 +164,8 @@ inline ostream& operator<< (ostream& o, const Event& e)
             type = "CLIENT_TIMEOUT"; break;
         case SERVER_TIMEOUT:
             type ="SERVER_TIMEOUT"; break;
+        case SYS_SET_CHANGE:
+            type = "SYS_SET_CHANGE"; break;
     }
 
     o << e.time << "," << type << "," << e.serverId << "," << e.coreId
@@ -195,6 +208,7 @@ class Simulation {
     // double respSum = 0.0;
     ofstream log_file;
 	ofstream event_log;
+    ifstream config;
 
     private:
         // void printLog(Time reqTime);
@@ -211,10 +225,12 @@ class Simulation {
         ~Simulation() {
             log_file.close();
             event_log.close();
+            config.close();
             Request::ctr = 0;
         }
 
-        void run();
+        void run(vector<double>& v, vector<double>& s, vector<double>& r);
+        void handleConfigChange(Event &e);
         Request& getRequest(int reqId);
         void clientTimeout(Request& req);
         Time simTime();

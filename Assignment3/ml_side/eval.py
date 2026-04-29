@@ -5,11 +5,15 @@ import torch
 import csv
 
 def mape(y_true, y_pred):
-    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+    return np.mean(np.abs((y_true - y_pred) / y_true + 1e-8)) * 100
 
 def p90_error(y_true, y_pred):
-    errors = np.abs((y_true - y_pred) / y_true) * 100
+    errors = np.abs((y_true - y_pred) / y_true + 1e-8) * 100
     return np.percentile(errors, 90)
+
+def percentile_ape(y_true, y_pred, p):
+    errors = np.abs((y_true - y_pred) / y_true + 1e-8) * 100
+    return np.percentile(errors, p)
 
 def add_bias(X):
     return np.c_[np.ones(X.shape[0]), X]

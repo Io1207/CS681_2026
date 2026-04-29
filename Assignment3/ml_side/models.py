@@ -1,12 +1,16 @@
- #models .py
+# models .py
 # will be implementing some models from scratch here
 # just for fun and hopefully these will be easier to 
 # tinker with and tune to our liking that the library ones
 
 import numpy as np
 import matplotlib.pyplot as plt
-from ml_side.eval import mape, p90_error, mse, add_bias, load_csv, normalise, train_test_split
+from eval import mape, p90_error, percentile_ape, mse, add_bias, load_csv, normalise, train_test_split
 import csv
+import tqdm
+import torch
+import torch.nn as nn
+from sklearn.model_selection import train_test_split
 
 """
     I would not like to call Linear Regression a model but 
@@ -169,6 +173,81 @@ class DecisionTreeRegressor:
             return self._predict_one(x, node.left)
         else:
             return self._predict_one(x, node.right)
+
+"""
+    Artificial Neural Network:
+    It's a Black Box!!! I don't know what goes on and why
+"""
+class ANN_Model(nn.Module):
+    def __init__(self, input, hidden, output):
+        super().__init__()
+        self.weights = nn.ModuleList()
+        self.relus = nn.ModuleList()
+        last = input
+        for i in hidden:
+            self.weights.append(nn.Linear(last,i))
+            self.relus.append(nn.ReLU())
+            last = i
+        self.weights.append(nn.Linear(last, output))
+
+    def forward(self, x):
+        for w, r in zip(self.weights[:-1], self.relus):
+            x = r(w(x))
+        return self.weights[-1](x)
+
+class ANN:
+    def __init__(self, input, hidden, output, lr=0.001,device='cpu'):
+        self.device = device
+        self.model = ANN_Model(input, hidden, output).to(self.device)
+        self.lr = lr
+        self.loss_fn = mape
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+
+    def fit(self, X, y, epochs=1000):
+        X = torch.tensor(X, dtype=torch.float32)
+        y = torch.tensor(y, dtype=torch.float32).view(-1, 1)
+        X, valX, y, valy = train_test_split(X, y, test_size=0.1) 
+        X = X.to(self.device)
+        y = y.to(self.device)
+
+        # normalization
+        # X, self.X_mean, self.X_std = normalise(X)
+        # y, self.y_mean, self.y_std = normalise(y)
+
+
+        # valX = valX.to(self.device)
+        # valy = valy.to(self.device)
+
+        # valX = (valX - self.X_mean)/self.X_std
+        # valy_transformed = (valy - self.y_mean)/self.y_std 
+        for epoch in (range(epochs)):
+            self.model.train()
+            self.optimizer.zero_grad()
+            outputs = self.model(X)
+            loss = self.loss_fn(y, outputs)
+            loss.backward()
+            self.optimizer.step()
+
+            # with torch.no_grad():
+                # self.model.eval()
+                # val_out = self.model(valX)
+                # val_loss = self.loss_fn(val_out, valy_transformed)
+                # val_out = val_out * self.y_std + self.y_mean
+                # p90_e = p90_error(valy, val_out)
+                # p80_e = percentile_ape(valy, val_out, 80)
+
+            # print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item()}, Validation Loss: {val_loss.item()}, 90%ile_APE: {p90_e}, 80%ile_APE: {p80_e}")
+
+    def predict(self, X):
+        X = torch.tensor(X, dtype=torch.float32)
+        # X = (X - self.X_mean) / self.X_std
+        X = X.to(self.device)
+        with torch.no_grad():
+            self.model.eval()
+            out = self.model(X)
+            # out = out * self.y_std + self.y_mean
+            return out.cpu()
+
 
 def generate_toy_data(n=500):
     """
